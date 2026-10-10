@@ -1,0 +1,18 @@
+{
+    "model_version": "iforest_v1",
+    "algorithm": "IsolationForest",
+    "training_records": 59,
+    "features": [
+        "original_cost_cr",
+        "revised_cost_cr",
+        "expenditure_cr",
+        "reported_progress_pct",
+        "financial_utilization_pct",
+        "cost_deviation_pct",
+        "cost_overrun_cr"
+    ],
+    "random_state": 42,
+    "n_estimators": 300,
+    "contamination": "auto",
+    "training_date": "2026-09-24T12:24:17.994062"
+}

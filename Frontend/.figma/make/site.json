@@ -1,0 +1,10 @@
+{
+  "description": "Streamline project management and collaboration for teams by providing tools for task tracking, communication, and document sharing in one platform.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
