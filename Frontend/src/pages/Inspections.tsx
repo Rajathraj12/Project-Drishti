@@ -1,15 +1,20 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { projectService } from "../services/projectService"
 
 type Status = "Pending" | "Assigned" | "In Progress" | "Completed" | "Review Required"
 
-const inspections = [
-  { id: "INS-2026-001", project: "#4821", name: "Community Hall Construction", risk: 88, assigned: "K. Rajan", date: "12 Sep 2026", status: "In Progress" as Status, location: "Mysuru" },
-  { id: "INS-2026-002", project: "#7192", name: "Ward Road Widening", risk: 84, assigned: "S. Nair", date: "10 Sep 2026", status: "Review Required" as Status, location: "Bengaluru" },
-  { id: "INS-2026-003", project: "#3347", name: "Primary School Building", risk: 71, assigned: "—", date: "15 Sep 2026", status: "Pending" as Status, location: "Dharwad" },
-  { id: "INS-2026-004", project: "#5518", name: "Taluk Office Renovation", risk: 65, assigned: "P. Kumar", date: "8 Sep 2026", status: "Completed" as Status, location: "Shivamogga" },
-  { id: "INS-2026-005", project: "#2903", name: "Bridge Construction", risk: 62, assigned: "M. Reddy", date: "9 Sep 2026", status: "Assigned" as Status, location: "Hassan" },
-]
+type Inspection = {
+  id: string
+  project: string
+  name: string
+  risk: number
+  assigned: string
+  date: string
+  status: Status
+  location: string
+}
+
 
 const statusCls: Record<Status, string> = {
   "Pending": "status-pending",
@@ -31,9 +36,30 @@ const checklist = [
 
 export default function Inspections() {
   const navigate = useNavigate()
-  const [selected, setSelected] = useState<typeof inspections[0] | null>(null)
+  const [inspections, setInspections] = useState<Inspection[]>([])
+  const [selected, setSelected] = useState<Inspection | null>(null)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [filterStatus, setFilterStatus] = useState("all")
+
+  useEffect(() => {
+    projectService.getProjects().then(res => {
+      const projects = res.results || []
+      const newInspections = projects.slice(0, 5).map((p, i) => {
+        const statuses: Status[] = ["In Progress", "Review Required", "Pending", "Completed", "Assigned"]
+        return {
+          id: `INS-2026-00${i+1}`,
+          project: p.project_id,
+          name: p.project_name,
+          risk: Math.floor(Math.random() * 40) + 50,
+          assigned: ["K. Rajan", "S. Nair", "—", "P. Kumar", "M. Reddy"][i],
+          date: `${10 + i} Sep 2026`,
+          status: statuses[i],
+          location: p.state
+        }
+      })
+      setInspections(newInspections)
+    })
+  }, [])
 
   const toggle = (item: string) => setChecked(prev => ({ ...prev, [item]: !prev[item] }))
   const filtered = filterStatus === "all" ? inspections : inspections.filter(i => i.status === filterStatus)

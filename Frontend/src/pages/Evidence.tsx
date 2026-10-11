@@ -3,11 +3,11 @@ import { useState } from "react"
 type Tab = "all" | "photos" | "documents" | "inspections" | "remote"
 
 const timelineItems = [
-  { date: "Jan 2026", month: "JAN", year: "2026", title: "Initial site photographs", source: "Implementing Agency", project: "#4821", status: "Verified", type: "photos", icon: "🏗️" },
-  { date: "Apr 2026", month: "APR", year: "2026", title: "Progress update — 35% milestone", source: "Project Engineer", project: "#4821", status: "Verified", type: "documents", icon: "📄" },
-  { date: "Jul 2026", month: "JUL", year: "2026", title: "Agency site photograph", source: "Implementing Agency", project: "#4821", status: "Verified", type: "photos", icon: "📸" },
-  { date: "Aug 2026", month: "AUG", year: "2026", title: "Remote satellite imagery", source: "Remote Sensing Agency", project: "#4821", status: "Pending", type: "remote", icon: "🛰️" },
-  { date: "Sep 2026", month: "SEP", year: "2026", title: "Field inspection report", source: "District Inspector", project: "#4821", status: "Verified", type: "inspections", icon: "✅" },
+  { date: "Jan 2026", month: "JAN", year: "2026", title: "Initial site photographs", source: "Implementing Agency", project: "DR-0001", status: "Verified", type: "photos", icon: "🏗️" },
+  { date: "Apr 2026", month: "APR", year: "2026", title: "Progress update — 35% milestone", source: "Project Engineer", project: "DR-0001", status: "Verified", type: "documents", icon: "📄" },
+  { date: "Jul 2026", month: "JUL", year: "2026", title: "Agency site photograph", source: "Implementing Agency", project: "DR-0001", status: "Verified", type: "photos", icon: "📸" },
+  { date: "Aug 2026", month: "AUG", year: "2026", title: "Remote satellite imagery", source: "Remote Sensing Agency", project: "DR-0001", status: "Pending", type: "remote", icon: "🛰️" },
+  { date: "Sep 2026", month: "SEP", year: "2026", title: "Field inspection report", source: "District Inspector", project: "DR-0001", status: "Verified", type: "inspections", icon: "✅" },
 ]
 
 const allEvidence = [
@@ -59,14 +59,14 @@ export default function Evidence() {
               Project Evidence Repository
             </h1>
             <p style={{ color: "var(--color-text-muted)", fontSize: "0.8rem" }}>
-              All documentation, photographs, and inspection records — Project #4821 & others
+              All documentation, photographs, and inspection records — Project DR-0001 & others
             </p>
           </div>
 
           {/* Image Comparison */}
           <div className="gov-card" style={{ overflow: "hidden" }}>
             <div className="gov-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span>Site Progress Comparison — Project #4821, Community Hall Construction, Mysuru</span>
+              <span>Site Progress Comparison — Project DR-0001, Expressway Phase-I, Punjab</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <span style={{ fontSize: "0.7rem", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, padding: "2px 10px", color: "white" }}>Jan 2026</span>
                 <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75rem" }}>→</span>
@@ -124,7 +124,7 @@ export default function Evidence() {
 
           {/* Timeline */}
           <div className="gov-card" style={{ overflow: "hidden" }}>
-            <div className="gov-card-header">Evidence Timeline — Project #4821</div>
+            <div className="gov-card-header">Evidence Timeline — Project DR-0001</div>
             <div style={{ padding: "20px 22px" }}>
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", left: 72, top: 6, bottom: 6, width: 2, background: "linear-gradient(180deg, var(--color-navy-100), var(--color-orange-300))" }} />

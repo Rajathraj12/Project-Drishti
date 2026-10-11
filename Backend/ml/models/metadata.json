@@ -14,5 +14,5 @@
     "random_state": 42,
     "n_estimators": 300,
     "contamination": "auto",
-    "training_date": "2026-09-24T12:24:17.994062"
+    "training_date": "2026-10-11T04:36:25.959424"
 }

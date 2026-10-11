@@ -1,69 +1,81 @@
 import { useState } from "react"
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
 
 const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: GridIcon },
-  { label: "Projects", path: "/map", icon: MapIcon },
-  { label: "Risk Analysis", path: "/map", icon: ShieldIcon },
+  { label: "Projects", path: "/projects", icon: LayersIcon },
+  { label: "Map View", path: "/map", icon: MapIcon },
   { label: "Inspections", path: "/inspections", icon: ClipboardIcon },
-  { label: "Evidence", path: "/evidence", icon: LayersIcon },
-  { label: "Contractors", path: "/contractors/1", icon: BuildingIcon },
-  { label: "Reports", path: "/dashboard", icon: ChartIcon },
+  { label: "Evidence", path: "/evidence", icon: ShieldIcon },
+  { label: "Contractors", path: "/contractors", icon: BuildingIcon },
 ]
 
 export default function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, logout, isDevBypass, devRole, setDevRole } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  const handleLogout = () => {
+    logout()
+    navigate("/login")
+  }
+
+  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "U"
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-surface)" }}>
+      {isDevBypass && (
+        <div style={{ background: "#fefcbf", borderBottom: "1px solid #ecc94b", padding: "4px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.75rem", color: "#744210", fontWeight: 600 }}>
+          <span>🛠️ DEVELOPMENT BYPASS ACTIVE</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span>Simulate Role:</span>
+            <select 
+              value={devRole || "GOVERNMENT_OFFICER"} 
+              onChange={(e) => {
+                setDevRole(e.target.value);
+                window.location.reload();
+              }}
+              style={{ padding: "2px 6px", borderRadius: 4, border: "1px solid #ecc94b", background: "white", fontSize: "0.7rem", cursor: "pointer" }}
+            >
+              <option value="ADMIN">Admin</option>
+              <option value="GOVERNMENT_OFFICER">Government Officer</option>
+              <option value="FIELD_OFFICER">Field Officer</option>
+              <option value="IMPLEMENTING_AGENCY">Implementing Agency</option>
+              <option value="CITIZEN">Citizen</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* ===== TOP HEADER (White bar with logo) ===== */}
       <div className="gov-header" style={{ flexShrink: 0 }}>
         <div style={{ maxWidth: "100%", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
           {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => navigate("/dashboard")}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => navigate("/dashboard")}>
             <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 44, objectFit: "contain" }} />
+            <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--color-navy-900)", letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}>Drishti</span>
           </div>
 
           {/* Right side - actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button className="btn-gov-primary" style={{ padding: "7px 16px", fontSize: "0.78rem" }}>
-              + Add Project / Update
-            </button>
-            <button className="btn-gov-secondary" style={{ padding: "7px 16px", fontSize: "0.78rem" }}>
-              Reports
-            </button>
-
-            <div style={{ width: 1, height: 30, background: "#e2e8f0", margin: "0 4px" }} />
-
-            {/* Notifications */}
-            <button style={{
-              width: 36, height: 36, borderRadius: "50%", background: "#f7fafc",
-              border: "1px solid #e2e8f0", display: "flex", alignItems: "center",
-              justifyContent: "center", cursor: "pointer", position: "relative",
-            }}>
-              <BellIcon style={{ width: 16, height: 16, color: "#4a5568" }} />
-              <span style={{ position: "absolute", top: 5, right: 5, width: 8, height: 8, background: "var(--color-risk-high)", borderRadius: "50%", border: "1.5px solid white" }} />
-            </button>
-
             {/* User */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "4px 8px", borderRadius: 6, border: "1px solid var(--color-border)" }}>
               <div style={{
                 width: 32, height: 32, borderRadius: "50%",
                 background: "var(--color-navy-700)", display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ color: "white", fontSize: "0.7rem", fontWeight: 700 }}>RS</span>
+                <span style={{ color: "white", fontSize: "0.7rem", fontWeight: 700 }}>{initials}</span>
               </div>
               <div>
-                <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--color-text-primary)" }}>R. Sharma</div>
-                <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)" }}>Officer</div>
+                <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--color-text-primary)" }}>{user?.username || "Dev User"}</div>
+                <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{user?.role?.replace('_', ' ').toLowerCase() || "Role"}</div>
               </div>
             </div>
 
             <button
-              onClick={() => navigate("/")}
+              onClick={handleLogout}
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: "4px", borderRadius: 4 }}
               title="Sign out"
             >
@@ -91,14 +103,6 @@ export default function AppShell() {
           )
         })}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Search box */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 4, padding: "4px 10px" }}>
-            <SearchIcon style={{ width: 13, height: 13, color: "rgba(255,255,255,0.7)" }} />
-            <input
-              style={{ background: "transparent", border: "none", outline: "none", color: "white", fontSize: "0.78rem", width: 160 }}
-              placeholder="Search projects..."
-            />
-          </div>
           <button onClick={() => navigate("/report")} className="nav-link" style={{ background: "none", border: "none", height: 44 }}>
             Citizen Report
           </button>

@@ -1,16 +1,27 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
 
 export default function Login() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => navigate("/dashboard"), 1200)
+    setError("")
+    try {
+      await login({ username: email, password })
+      navigate("/dashboard")
+    } catch (err: any) {
+      setError(err.message || "Invalid credentials or server error")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -99,7 +110,7 @@ export default function Login() {
                 ))}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[{ p: 88, label: "#4821 Community Hall", c: "#ef4444" }, { p: 84, label: "#7192 Road Widening", c: "#f59e0b" }, { p: 65, label: "#3347 School Building", c: "#3b82f6" }].map(r => (
+                {[{ p: 88, label: "DR-0001 Expressway", c: "#ef4444" }, { p: 84, label: "#7192 Road Widening", c: "#f59e0b" }, { p: 65, label: "#3347 School Building", c: "#3b82f6" }].map(r => (
                   <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", width: 130, flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
                     <div style={{ flex: 1, background: "rgba(255,255,255,0.1)", borderRadius: 99, height: 4 }}>
@@ -131,6 +142,7 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {error && <div style={{ color: "red", fontSize: "0.8rem", textAlign: "center" }}>{error}</div>}
                 <div>
                   <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--color-navy-700)", marginBottom: 6 }}>
                     Email / User ID

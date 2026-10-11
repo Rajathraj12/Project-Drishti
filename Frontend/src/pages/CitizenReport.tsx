@@ -112,7 +112,7 @@ export default function CitizenReport() {
             type="text"
             value={form.projectId}
             onChange={e => setForm(p => ({ ...p, projectId: e.target.value }))}
-            placeholder="e.g. #4821"
+            placeholder="e.g. DR-0001"
             className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 placeholder-slate-300 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100 transition-all font-mono"
           />
         </div>

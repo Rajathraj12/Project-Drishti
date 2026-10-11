@@ -81,6 +81,11 @@ export interface Project {
   risk_status?: 'High Risk' | 'Medium Risk' | 'Low Risk';
   multiState?: boolean;
   states?: string[];
+  risk_level?: string;
+  ml_anomaly_score?: number | null;
+  anomaly_flag?: boolean | null;
+  anomaly_status?: string;
+  ml_explanation?: string | null;
 }
 
 export interface Milestone {

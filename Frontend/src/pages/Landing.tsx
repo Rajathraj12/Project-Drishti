@@ -207,7 +207,7 @@ export default function Landing() {
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
             {[
-              { sector: "Infrastructure", org: "PWD Karnataka", project: "Community Hall Construction", cost: "₹ 2.4 Cr", progress: 47, revised: "₹ 2.6 Cr", date: "31/12/2026", icon: "🏛️" },
+              { sector: "Infrastructure", org: "PWD Karnataka", project: "Expressway Phase-I", cost: "₹ 1,895 Cr", progress: 47, revised: "₹ 2,034 Cr", date: "31/12/2026", icon: "🏛️" },
               { sector: "Roads", org: "BBMP Bengaluru", project: "Ward Road Widening", cost: "₹ 5.1 Cr", progress: 61, revised: "₹ 5.1 Cr", date: "30/06/2026", icon: "🛣️" },
               { sector: "Education", org: "School Dept. KA", project: "Primary School Building", cost: "₹ 1.8 Cr", progress: 55, revised: "₹ 1.95 Cr", date: "31/03/2027", icon: "🏫" },
               { sector: "Transport", org: "NHAI Hassan", project: "Bridge Construction (NH-48)", cost: "₹ 12.4 Cr", progress: 38, revised: "₹ 13.2 Cr", date: "31/12/2028", icon: "🌉" },

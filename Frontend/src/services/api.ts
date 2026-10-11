@@ -10,9 +10,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
  */
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('token');
+  const devRole = localStorage.getItem('dev_role');
+  
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(devRole ? { 'X-Dev-Role': devRole } : {}),
     ...options.headers,
   };
 

@@ -44,7 +44,7 @@ export const projectService = {
    * GET /api/projects/{id}/risk
    */
   async getProjectRisk(id: string): Promise<RiskAssessment> {
-    return fetchApi<RiskAssessment>(`/projects/${id}/analyze`, { method: 'POST' });
+    return fetchApi<RiskAssessment>(`/projects/${id}/risk/`, { method: 'GET' });
   },
 
   /**
@@ -59,5 +59,31 @@ export const projectService = {
    */
   async triggerAnalysis(id: string): Promise<RiskAssessment> {
     return fetchApi<RiskAssessment>(`/projects/${id}/analyze/`, { method: 'POST' });
+  },
+
+  /**
+   * POST /api/projects/bulk-analyze/
+   */
+  async bulkAnalyzeProjects(): Promise<{total_projects: number, successful: number, unavailable: number, failures: number}> {
+    return fetchApi<any>(`/projects/bulk-analyze/`, { method: 'POST' });
+  },
+
+  async getProjectMlRisk(id: string): Promise<any> {
+    return fetchApi<any>(`/projects/${id}/ml-risk/`, { method: 'GET' });
+  },
+
+  async triggerMlAnalysis(id: string): Promise<any> {
+    return fetchApi<any>(`/projects/${id}/ml-analyze/`, { method: 'POST' });
+  },
+
+  async submitVerification(id: string, data: any): Promise<any> {
+    return fetchApi<any>(`/projects/${id}/verify/`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getVerifications(id: string): Promise<any[]> {
+    return fetchApi<any[]>(`/projects/${id}/verifications/`, { method: 'GET' });
   }
 };

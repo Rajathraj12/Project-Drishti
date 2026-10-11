@@ -41,10 +41,11 @@ export default function ProjectsList() {
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
       const matchState = selectedState === "All States" || p.state === selectedState;
-      const matchSector = selectedSector === "All Sectors" || p.department === selectedSector || p.project_category === selectedSector;
+      const sectorVal = p.sector || p.department || p.project_category || "";
+      const matchSector = selectedSector === "All Sectors" || sectorVal === selectedSector;
       const term = search.toLowerCase();
       const matchSearch = !term || [
-        p.project_id, p.project_name, p.state, p.source_project_id, p.department, p.project_category
+        p.project_id, p.project_name, p.state, p.source_project_id, p.sector, p.department, p.project_category
       ].some(val => val && String(val).toLowerCase().includes(term));
       
       return matchState && matchSector && matchSearch;
@@ -86,7 +87,7 @@ export default function ProjectsList() {
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div style={{ overflowX: "auto" }}>
-          <table className="w-full text-left text-sm whitespace-nowrap">
+          <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-600">
               <tr>
                 <th className="px-4 py-3">Project ID</th>
@@ -97,28 +98,49 @@ export default function ProjectsList() {
                 <th className="px-4 py-3">Revised Cost</th>
                 <th className="px-4 py-3">Expenditure</th>
                 <th className="px-4 py-3">Progress</th>
+                <th className="px-4 py-3">Risk</th>
                 <th className="px-4 py-3">Data Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredProjects.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">No projects found.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-500">No projects found.</td></tr>
               )}
               {filteredProjects.map((p) => {
-                const sector = p.department || p.project_category || "-";
-                const formatCr = (val?: number) => val != null ? `₹${(val / 10000000).toLocaleString('en-IN', {maximumFractionDigits: 2})} Cr` : "-";
+                const sector = p.sector || p.department || p.project_category || "-";
+                // Data is already in Crores from the backend API
+                const formatCr = (val?: number) => val != null ? `₹${Number(val).toLocaleString('en-IN', {maximumFractionDigits: 2})} Cr` : "-";
                 const isDemo = p.data_source_type === 'SYNTHETIC_DEMO';
                 
                 return (
                   <tr key={p.project_id} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/projects/${p.project_id}`)}>
                     <td className="px-4 py-3 font-mono text-xs">{p.project_id}</td>
-                    <td className="px-4 py-3 max-w-[200px] truncate" title={p.project_name}>{p.project_name}</td>
+                    <td className="px-4 py-3 min-w-[300px] max-w-[400px]" style={{ whiteSpace: "normal", lineHeight: "1.4" }} title={p.project_name}>{p.project_name}</td>
                     <td className="px-4 py-3">{p.state}</td>
                     <td className="px-4 py-3">{sector}</td>
-                    <td className="px-4 py-3">{formatCr(p.original_cost)}</td>
-                    <td className="px-4 py-3">{formatCr(p.revised_cost)}</td>
-                    <td className="px-4 py-3">{formatCr(p.expenditure)}</td>
-                    <td className="px-4 py-3">{p.reported_progress != null ? `${p.reported_progress}%` : "-"}</td>
+                    <td className="px-4 py-3">{formatCr(p.original_cost_cr ?? p.original_cost)}</td>
+                    <td className="px-4 py-3">{formatCr(p.revised_cost_cr ?? p.revised_cost)}</td>
+                    <td className="px-4 py-3">{formatCr(p.expenditure_cr ?? p.expenditure)}</td>
+                    <td className="px-4 py-3">{(p.reported_progress_pct ?? p.reported_progress) != null ? `${p.reported_progress_pct ?? p.reported_progress}%` : "-"}</td>
+                    <td className="px-4 py-3">
+                      {p.risk_score != null ? (
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono font-bold ${p.risk_level === 'Critical' ? 'text-red-600' : p.risk_level === 'High' ? 'text-orange-600' : p.risk_level === 'Medium' ? 'text-amber-600' : 'text-green-600'}`}>
+                            {p.risk_score}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            p.risk_level === 'Critical' ? 'bg-red-100 text-red-700' : 
+                            p.risk_level === 'High' ? 'bg-orange-100 text-orange-700' : 
+                            p.risk_level === 'Medium' ? 'bg-amber-100 text-amber-700' : 
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {p.risk_level?.toUpperCase() || 'LOW'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-sm">N/A</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-[10px] font-bold ${isDemo ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
                         {isDemo ? 'Synthetic Demo' : 'Official'}

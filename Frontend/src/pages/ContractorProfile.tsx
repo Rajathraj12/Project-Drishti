@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts"
 
@@ -21,12 +21,17 @@ const projectHistory = [
   { id: "#6120", name: "Urban Road Widening — KR Puram", year: "2024", value: "₹6.2 Cr", status: "Completed", delay: "3 months" },
   { id: "#6891", name: "Industrial Shed — Bommasandra", year: "2024", value: "₹2.8 Cr", status: "Completed", delay: "5 months" },
   { id: "#7192", name: "Ward Road Widening — Bengaluru", year: "2025", value: "₹5.1 Cr", status: "In Progress", delay: "3 months" },
-  { id: "#4821", name: "Community Hall — Mysuru", year: "2026", value: "₹2.4 Cr", status: "In Progress", delay: "5 months" },
+  { id: "DR-0001", name: "Expressway Phase-I — Punjab", year: "2026", value: "₹1895.74 Cr", status: "In Progress", delay: "5 months" },
 ]
 
 export default function ContractorProfile() {
   const navigate = useNavigate()
+  const { id } = useParams()
   const [animated, setAnimated] = useState(false)
+  
+  // Mock dynamic data based on ID
+  const contractorName = id === "C-2099" ? "L&T Construction" : id === "C-3301" ? "Sharma Civil Works" : id === "C-4192" ? "Himalaya Roadways" : id === "C-5582" ? "MegaCorp Builders" : id === "C-6011" ? "Deccan Engineering" : "ABC Infrastructure Pvt. Ltd."
+  const registration = `REG/CON/2018/${id?.replace('C-', '') || '1047'}`
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100)
@@ -39,9 +44,9 @@ export default function ContractorProfile() {
       <div className="flex items-center gap-2 text-xs text-slate-400">
         <button onClick={() => navigate("/dashboard")} className="hover:text-slate-600 transition-colors">Dashboard</button>
         <span>›</span>
-        <span>Contractors</span>
+        <button onClick={() => navigate("/contractors")} className="hover:text-slate-600 transition-colors">Contractors</button>
         <span>›</span>
-        <span className="text-navy-700">ABC Infrastructure Pvt. Ltd.</span>
+        <span className="text-navy-700">{contractorName}</span>
       </div>
 
       {/* Header card */}
@@ -52,13 +57,13 @@ export default function ContractorProfile() {
               🏗️
             </div>
             <div>
-              <h1 className="font-display font-700 text-2xl text-navy-900">ABC Infrastructure Pvt. Ltd.</h1>
+              <h1 className="font-display font-700 text-2xl text-navy-900">{contractorName}</h1>
               <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-400">
-                <span>Registered Contractor · Karnataka</span>
+                <span>Registered Contractor</span>
                 <span>·</span>
                 <span>Category: Class A Civil Works</span>
                 <span>·</span>
-                <span>Registration: KA/CON/2018/1047</span>
+                <span>Registration: {registration}</span>
               </div>
             </div>
           </div>

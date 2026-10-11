@@ -20,40 +20,55 @@ export default function Dashboard() {
   const [allProjects, setAllProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedState, setSelectedState] = useState("All States")
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeSummary, setAnalyzeSummary] = useState<any>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100)
-    
-    const fetchProjects = async () => {
-      try {
-        const response = await projectService.getProjects()
-        setAllProjects(response.results || [])
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchProjects()
-
     return () => clearTimeout(t)
   }, [])
+  
+  const fetchProjects = async () => {
+    setLoading(true)
+    try {
+      const response = await projectService.getProjects()
+      setAllProjects(response.results || [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBulkAnalyze = async () => {
+    setAnalyzing(true)
+    try {
+      const res = await projectService.bulkAnalyzeProjects();
+      setAnalyzeSummary(res);
+      await fetchProjects(); // Refresh dashboard
+    } catch (e) {
+      console.error("Bulk analysis failed", e);
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   const states = ["All States", ...Array.from(new Set(allProjects.map(p => p.state).filter(Boolean))).sort()]
   
   const projects = allProjects.filter(p => selectedState === "All States" || p.state === selectedState)
 
-  const formatCr = (val?: number) => val != null ? `₹${(val / 10000000).toLocaleString('en-IN', {maximumFractionDigits: 0})}` : "₹0"
+  const formatCr = (val?: number) => val != null ? `₹${val.toLocaleString('en-IN', {maximumFractionDigits: 0})}` : "₹0"
   
-  const totalCost = projects.reduce((sum, p) => sum + (p.original_cost || 0), 0)
-  const totalRevised = projects.reduce((sum, p) => sum + (p.revised_cost || 0), 0)
-  const totalExp = projects.reduce((sum, p) => sum + (p.expenditure || 0), 0)
+  const totalCost = projects.reduce((sum, p) => sum + (Number(p.original_cost) || 0), 0)
+  const totalRevised = projects.reduce((sum, p) => sum + (Number(p.revised_cost) || 0), 0)
+  const totalExp = projects.reduce((sum, p) => sum + (Number(p.expenditure) || 0), 0)
   const officialCount = projects.filter(p => p.data_source_type === 'OFFICIAL').length
   const syntheticCount = projects.filter(p => p.data_source_type === 'SYNTHETIC_DEMO').length
 
-  const dummyHighRiskCount = Math.floor(projects.length * 0.15)
-  const dummyMediumRiskCount = Math.floor(projects.length * 0.40)
-  const dummyLowRiskCount = projects.length - dummyHighRiskCount - dummyMediumRiskCount
+  const dummyHighRiskCount = projects.filter(p => p.risk_level === 'High' || p.risk_level === 'Critical').length
+  const dummyMediumRiskCount = projects.filter(p => p.risk_level === 'Medium').length
+  const dummyLowRiskCount = projects.filter(p => p.risk_level === 'Low' || !p.risk_level).length
 
   const riskData = [
     { name: "High Risk", value: dummyHighRiskCount, color: "#c53030" },
@@ -90,7 +105,20 @@ export default function Dashboard() {
                 · Welcome, Rajath
               </p>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {analyzeSummary && (
+                <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded font-bold border border-green-200">
+                  {analyzeSummary.successful} assessed ({analyzeSummary.unavailable} unavailable)
+                </span>
+              )}
+              <button
+                onClick={handleBulkAnalyze}
+                disabled={analyzing}
+                className={`btn-gov-primary`}
+                style={{ padding: "7px 16px", fontSize: "0.78rem", borderRadius: 4, background: "var(--color-risk-high)", borderColor: "var(--color-risk-high)", opacity: analyzing ? 0.7 : 1 }}
+              >
+                {analyzing ? 'Analyzing...' : 'Analyze All Projects'}
+              </button>
               <button
                 onClick={() => setActiveTab("ministry")}
                 className={`btn-gov-${activeTab === "ministry" ? "primary" : "outline"}`}
@@ -165,15 +193,15 @@ export default function Dashboard() {
                       <th>Location</th>
                       <th>Budget</th>
                       <th>Progress (%)</th>
-                      <th>Expected (%)</th>
-                      <th>Risk Score</th>
-                      <th>Status</th>
+                      <th>Rule Risk Score</th>
+                      <th>ML Anomaly</th>
+                      <th>Verification</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {projects.slice(0, 10).map((p, i) => {
-                      const riskScore = Math.floor(Math.random() * 40) + 50; // Random mock score between 50-90
-                      const status = riskScore >= 80 ? 'High Risk' : (riskScore >= 60 ? 'Medium Risk' : 'Low Risk');
+                    {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 10).map((p, i) => {
+                      const riskScore = p.risk_score;
+                      const status = p.risk_level ? `${p.risk_level} Risk` : (riskScore != null ? (riskScore >= 70 ? 'High Risk' : (riskScore >= 40 ? 'Medium Risk' : 'Low Risk')) : 'Not Analyzed');
                       const progressStr = p.reported_progress != null ? `${p.reported_progress}` : "0";
                       
                       return (
@@ -199,15 +227,34 @@ export default function Dashboard() {
                             <span style={{ fontSize: "0.75rem", color: "var(--color-navy-600)", fontWeight: 600 }}>{progressStr}%</span>
                           </div>
                         </td>
-                        <td style={{ fontSize: "0.78rem", color: "var(--color-text-muted)" }}>-</td>
                         <td>
-                          <span style={{
-                            fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1rem",
-                            color: riskScore >= 80 ? "var(--color-risk-high)" : riskScore >= 60 ? "var(--color-risk-medium)" : "var(--color-risk-low)",
-                          }}>{riskScore}</span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={{
+                              fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1rem",
+                              color: riskScore == null ? "var(--color-text-muted)" : (riskScore >= 70 ? "var(--color-risk-high)" : riskScore >= 40 ? "var(--color-risk-medium)" : "var(--color-risk-low)"),
+                            }}>{riskScore != null ? riskScore : "N/A"}</span>
+                            <RiskBadge status={status} />
+                          </div>
                         </td>
                         <td>
-                          <RiskBadge status={status} />
+                          {p.anomaly_status === "ASSESSED" ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                              <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "0.9rem", color: p.anomaly_flag ? "var(--color-risk-high)" : "var(--color-risk-low)" }}>
+                                Score: {p.ml_anomaly_score}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: p.anomaly_flag ? "#b91c1c" : "#15803d", fontWeight: "bold", background: p.anomaly_flag ? "#fef2f2" : "#f0fdf4", padding: "2px 6px", borderRadius: "4px", width: "fit-content" }}>
+                                {p.anomaly_flag ? "ANOMALOUS" : "NORMAL"}
+                              </span>
+                              {p.anomaly_flag && <span style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }} title={p.ml_explanation}>Hover for Details</span>}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>{p.anomaly_status?.replace("_", " ")}</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${p.verification_status === 'VERIFIED' ? 'bg-green-100 text-green-700' : p.verification_status === 'CLOSED' ? 'bg-slate-200 text-slate-700' : p.verification_status === 'IN_REVIEW' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {p.verification_status || 'NOT_REVIEWED'}
+                          </span>
                         </td>
                       </tr>
                       );
@@ -267,9 +314,9 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {projects.slice(0, 3).map((p, i) => {
-                    const risk = 85 - i*10; // dummy risk for cards
-                    const issue = "Automated data scan flag";
+                  {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 3).map((p, i) => {
+                    const risk = p.risk_score || 0;
+                    const issue = p.risk_level === 'Critical' || p.risk_level === 'High' ? "Requires attention" : "Monitored project";
                     return (
                     <div
                       key={p.project_id}
@@ -338,7 +385,7 @@ export default function Dashboard() {
             <div className="gov-card-header">Recent Activity</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
               {[
-                { action: "Inspection completed", project: "#4821", time: "2h ago", color: "var(--color-risk-low)", bg: "var(--color-risk-low-bg)" },
+                { action: "Inspection completed", project: "DR-0001", time: "2h ago", color: "var(--color-risk-low)", bg: "var(--color-risk-low-bg)" },
                 { action: "New evidence uploaded", project: "#7192", time: "4h ago", color: "var(--color-navy-500)", bg: "var(--color-navy-50)" },
                 { action: "Risk score updated", project: "#3347", time: "6h ago", color: "var(--color-risk-medium)", bg: "var(--color-risk-medium-bg)" },
                 { action: "Citizen report received", project: "#5518", time: "Yesterday", color: "#718096", bg: "#f7fafc" },
