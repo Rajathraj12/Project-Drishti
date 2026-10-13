@@ -27,18 +27,20 @@ export default function Login() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--color-surface)" }}>
       {/* Header */}
-      <header style={{ background: "white", borderBottom: "3px solid var(--color-orange-400)", padding: "0 24px", height: 68, display: "flex", alignItems: "center" }}>
+      <header className="gov-header" style={{ padding: "0 28px", height: 68, display: "flex", alignItems: "center", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 44, height: 44, background: "var(--color-navy-700)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <EyeSvg />
-          </div>
+          <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 44, objectFit: "contain" }} />
           <div>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "1rem" }}>Project Drishti</div>
-            <div style={{ fontSize: "0.65rem", color: "var(--color-text-muted)" }}>Government of India — Infrastructure Monitoring</div>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, color: "var(--color-navy-900)", fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1 }}>Project Drishti</div>
+            <div style={{ fontSize: "0.58rem", color: "var(--color-text-muted)", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>Government of India — Infrastructure Monitoring</div>
           </div>
         </div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          <span className="live-dot" />
+          <span style={{ fontSize: "0.72rem", color: "#16a34a", fontWeight: 600 }}>Live</span>
+        </div>
       </header>
-      <nav style={{ background: "var(--color-navy-700)", height: 44 }} />
+      <div className="gov-navbar" style={{ height: 46 }} />
 
       {/* Main */}
       <div style={{ flex: 1, display: "flex" }}>
@@ -59,9 +61,7 @@ export default function Login() {
           <div style={{ position: "relative", zIndex: 1 }}>
             {/* Logo */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 40 }}>
-              <div style={{ width: 40, height: 40, background: "rgba(255,255,255,0.12)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.2)" }}>
-                <EyeSvg size={20} />
-              </div>
+              <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 42, objectFit: "contain" }} />
               <div>
                 <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "white", fontSize: "1rem" }}>Project Drishti</div>
                 <div style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Gov. Monitoring Platform</div>
@@ -125,11 +125,11 @@ export default function Login() {
         </div>
 
         {/* Right panel — Form */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px", background: "#f8fafc" }}>
-          <div style={{ width: "100%", maxWidth: 400 }}>
-            <div style={{ background: "white", border: "1px solid var(--color-border)", borderRadius: 10, padding: "36px 32px", boxShadow: "0 4px 20px rgba(26,48,104,0.08)" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px", background: "linear-gradient(135deg, #f8fafc 0%, var(--color-surface) 100%)" }}>
+          <div style={{ width: "100%", maxWidth: 420 }}>
+            <div className="gov-card" style={{ padding: "36px 32px", overflow: "visible" }}>
               {/* Header strip */}
-              <div style={{ height: 4, background: "linear-gradient(90deg, var(--color-orange-400), var(--color-navy-500))", margin: "-36px -32px 28px", borderRadius: "10px 10px 0 0" }} />
+              <div style={{ height: 4, background: "linear-gradient(90deg, var(--color-orange-400), var(--color-navy-500), var(--color-orange-400))", backgroundSize: "200% 100%", animation: "gradientShift 3s ease infinite", margin: "-36px -32px 28px", borderRadius: "16px 16px 0 0" }} />
 
               <div style={{ textAlign: "center", marginBottom: 28 }}>
                 <div style={{ width: 48, height: 48, background: "var(--color-navy-50)", border: "1px solid var(--color-border)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
@@ -210,13 +210,5 @@ export default function Login() {
         </div>
       </div>
     </div>
-  )
-}
-
-function EyeSvg({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-    </svg>
   )
 }

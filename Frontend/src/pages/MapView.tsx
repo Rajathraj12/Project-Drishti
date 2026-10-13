@@ -87,10 +87,13 @@ export default function MapView() {
   return (
     <div className="flex h-full" style={{ height: "calc(100vh - 57px)", background: "var(--color-surface)" }}>
       {/* Left sidebar */}
-      <div className="w-72 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col overflow-hidden relative z-20 shadow-md">
-        <div className="p-4 border-b border-slate-100 bg-navy-50">
-          <h2 className="font-display font-bold text-navy-900 text-lg">Project Map</h2>
-          <p className="text-xs text-slate-500 mt-0.5">{filtered.length} projects shown</p>
+      <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden relative z-20" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRight: "1px solid rgba(220,232,245,0.7)", boxShadow: "4px 0 24px rgba(26,48,104,0.08)" }}>
+        <div style={{ padding: "16px", borderBottom: "1px solid rgba(220,232,245,0.6)", background: "linear-gradient(135deg, var(--color-navy-800), var(--color-navy-700))", display: "flex", flexDirection: "column", gap: 4 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "white", fontSize: "1rem", letterSpacing: "-0.01em", margin: 0 }}>Project Map</h2>
+          <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.6)", margin: 0, display: "flex", alignItems: "center", gap: 5 }}>
+            <span className="live-dot" style={{ width: 6, height: 6 }} />
+            {filtered.length} projects shown
+          </p>
         </div>
 
         {/* Filters */}
@@ -218,20 +221,25 @@ export default function MapView() {
         </MapContainer>
 
         {/* Map overlay stats */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200 px-5 py-4 shadow-lg z-10">
-          <div className="text-sm font-bold text-navy-900 mb-3">National Overview</div>
-          <div className="flex gap-5">
-            {[
-              { color: "#DC2626", count: markers.filter(m => m.risk >= 70).length, label: "High" },
-              { color: "#D97706", count: markers.filter(m => m.risk >= 50 && m.risk < 70).length, label: "Medium" },
-              { color: "#16A34A", count: markers.filter(m => m.risk < 50).length, label: "Low" },
-            ].map(s => (
-              <div key={s.label} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></div>
-                <span className="font-mono font-700 text-xs" style={{ color: s.color }}>{s.count}</span>
-                <span className="text-xs text-slate-400">{s.label}</span>
-              </div>
-            ))}
+        <div style={{ position: "absolute", top: 16, left: 16, zIndex: 10 }} className="glass-panel">
+          <div style={{ padding: "14px 18px" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-navy-800)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <span className="live-dot" />
+              National Overview
+            </div>
+            <div style={{ display: "flex", gap: 14 }}>
+              {[
+                { color: "#DC2626", count: markers.filter(m => m.risk >= 70).length, label: "High" },
+                { color: "#D97706", count: markers.filter(m => m.risk >= 50 && m.risk < 70).length, label: "Medium" },
+                { color: "#16A34A", count: markers.filter(m => m.risk < 50).length, label: "Low" },
+              ].map(s => (
+                <div key={s.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.6)", borderRadius: 10, padding: "8px 12px", border: "1px solid rgba(220,232,245,0.6)" }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, boxShadow: `0 0 8px ${s.color}80` }} />
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, fontSize: "1rem", color: s.color, lineHeight: 1 }}>{s.count}</span>
+                  <span style={{ fontSize: "0.6rem", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

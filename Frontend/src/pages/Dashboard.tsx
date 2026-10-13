@@ -80,59 +80,53 @@ export default function Dashboard() {
   return (
     <div>
       {/* Page title bar */}
-      <div style={{ background: "var(--color-navy-700)", padding: "10px 24px", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.78rem" }}>Home</span>
-        <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.78rem" }}>›</span>
-        <span style={{ color: "white", fontSize: "0.78rem", fontWeight: 600 }}>Dashboard</span>
-        <div style={{ marginLeft: "auto", fontSize: "0.72rem", color: "rgba(255,255,255,0.6)" }}>
-          Data as of: {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+      <div className="page-title-bar">
+        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.76rem" }}>Home</span>
+        <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.76rem" }}>›</span>
+        <span style={{ color: "white", fontSize: "0.76rem", fontWeight: 600 }}>Dashboard</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="live-dot" />
+          <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.55)" }}>
+            Data as of: {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+          </span>
         </div>
       </div>
 
-      <div className="wave-bg" style={{ minHeight: "calc(100vh - 108px)", padding: "24px 24px 40px" }}>
+      <div className="wave-bg" style={{ minHeight: "calc(100vh - 110px)", padding: "24px 28px 48px" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
 
-          {/* ===== WELCOME + TABS ===== */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          {/* WELCOME + TABS */}
+          <div className="animate-fade-in-up" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
             <div>
-              <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.3rem", color: "var(--color-navy-700)", marginBottom: 2 }}>
-                Project Overview Dashboard
+              <div className="section-label" style={{ marginBottom: 8 }}>Project Overview</div>
+              <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.45rem", color: "var(--color-navy-800)", marginBottom: 4, letterSpacing: "-0.02em" }}>
+                Infrastructure Dashboard
               </h1>
-              <p style={{ color: "var(--color-text-muted)", fontSize: "0.8rem" }}>
-                <select value={selectedState} onChange={(e) => setSelectedState(e.target.value)} style={{ background: "transparent", border: "1px solid var(--color-border)", borderRadius: 4, padding: "2px 4px", fontSize: "0.75rem", color: "var(--color-navy-700)", fontWeight: 600, marginRight: 8, outline: "none" }}>
+              <p style={{ color: "var(--color-text-muted)", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: 6 }}>
+                <select value={selectedState} onChange={(e) => setSelectedState(e.target.value)} style={{ background: "white", border: "1.5px solid var(--color-border)", borderRadius: 8, padding: "3px 8px", fontSize: "0.76rem", color: "var(--color-navy-700)", fontWeight: 600, outline: "none", cursor: "pointer", boxShadow: "0 1px 4px rgba(26,48,104,0.06)" }}>
                   {states.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                · Welcome, Rajath
+                <span>· Welcome back, Rajath 👋</span>
               </p>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {analyzeSummary && (
-                <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded font-bold border border-green-200">
-                  {analyzeSummary.successful} assessed ({analyzeSummary.unavailable} unavailable)
+                <span style={{ fontSize: "0.72rem", color: "var(--color-risk-low)", background: "var(--color-risk-low-bg)", padding: "5px 12px", borderRadius: 99, fontWeight: 700, border: "1px solid var(--color-risk-low-border)" }}>
+                  ✓ {analyzeSummary.successful} assessed
                 </span>
               )}
               <button
                 onClick={handleBulkAnalyze}
                 disabled={analyzing}
-                className={`btn-gov-primary`}
-                style={{ padding: "7px 16px", fontSize: "0.78rem", borderRadius: 4, background: "var(--color-risk-high)", borderColor: "var(--color-risk-high)", opacity: analyzing ? 0.7 : 1 }}
+                className="btn-gov-primary animate-pulse-glow-red"
+                style={{ background: "linear-gradient(135deg, var(--color-risk-high), #e05252)", fontSize: "0.8rem", opacity: analyzing ? 0.75 : 1 }}
               >
-                {analyzing ? 'Analyzing...' : 'Analyze All Projects'}
+                {analyzing ? (
+                  <><svg style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" /><path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" /></svg> Analyzing...</>
+                ) : '🔍 Analyze All'}
               </button>
-              <button
-                onClick={() => setActiveTab("ministry")}
-                className={`btn-gov-${activeTab === "ministry" ? "primary" : "outline"}`}
-                style={{ padding: "7px 16px", fontSize: "0.78rem", borderRadius: 4 }}
-              >
-                Ministry-Wise
-              </button>
-              <button
-                onClick={() => setActiveTab("sector")}
-                className={`btn-gov-${activeTab === "sector" ? "primary" : "outline"}`}
-                style={{ padding: "7px 16px", fontSize: "0.78rem", borderRadius: 4 }}
-              >
-                Sector-Wise
-              </button>
+              <button onClick={() => setActiveTab("ministry")} className={`btn-gov-${activeTab === "ministry" ? "primary" : "outline"}`} style={{ fontSize: "0.8rem" }}>Ministry</button>
+              <button onClick={() => setActiveTab("sector")} className={`btn-gov-${activeTab === "sector" ? "primary" : "outline"}`} style={{ fontSize: "0.8rem" }}>Sector</button>
             </div>
           </div>
 
@@ -146,31 +140,29 @@ export default function Dashboard() {
                   <span style={{ opacity: 0.7, fontSize: "0.78rem", fontWeight: 400 }}>
                     (as of {new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" })})
                   </span>
-                </div>
-                <div style={{ padding: "20px 20px 16px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                                <div style={{ padding: "20px 20px 18px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
                     {[
-                      { icon: "📋", label: "Project Count (No.)", value: projects.length.toLocaleString(), info: true },
-                      { icon: "💰", label: "Original Cost (in Cr.)", value: formatCr(totalCost), info: true },
-                      { icon: "📊", label: "Latest Revised Cost (in Cr.)", value: formatCr(totalRevised), info: true },
-                      { icon: "📈", label: "Expenditure (Cumm.) (in Cr.)", value: formatCr(totalExp), info: true },
-                      { icon: "✅", label: "Official Projects", value: officialCount.toLocaleString(), info: true },
-                      { icon: "🧪", label: "Synthetic Demo Projects", value: syntheticCount.toLocaleString(), info: true },
+                      { icon: "📋", label: "Project Count", value: projects.length.toLocaleString(), accent: false },
+                      { icon: "💰", label: "Original Cost (Cr.)", value: formatCr(totalCost), accent: false },
+                      { icon: "📊", label: "Revised Cost (Cr.)", value: formatCr(totalRevised), accent: false },
+                      { icon: "📈", label: "Expenditure (Cr.)", value: formatCr(totalExp), accent: false },
+                      { icon: "✅", label: "Official Projects", value: officialCount.toLocaleString(), accent: false },
+                      { icon: "🧪", label: "Synthetic Demo", value: syntheticCount.toLocaleString(), accent: true },
                     ].map((s, i) => (
-                      <div key={s.label} className="gov-stat-card" style={{ opacity: animated ? 1 : 0, transform: animated ? "none" : "translateY(10px)", transition: `all 0.4s ease ${i * 60}ms` }}>
-                        <span style={{ fontSize: "1.8rem", flexShrink: 0 }}>{s.icon}</span>
-                        <div>
-                          <div style={{ fontSize: "0.72rem", color: "var(--color-text-muted)", marginBottom: 4, lineHeight: 1.4 }}>
-                            {s.label}
-                            {s.info && <span style={{ marginLeft: 4, fontSize: "0.6rem", color: "#a0aec0" }}>ⓘ</span>}
-                          </div>
-                          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.05rem", color: i === 5 ? "var(--color-risk-high)" : "var(--color-navy-700)" }}>
-                            {s.value}
-                          </div>
+                      <div
+                        key={s.label}
+                        className={`gov-stat-card animate-fade-in-up delay-${(i + 1) * 100}`}
+                      >
+                        <div className="stat-icon-wrap">{s.icon}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: "0.7rem", color: "var(--color-text-muted)", marginBottom: 5, lineHeight: 1.4, fontWeight: 500 }}>{s.label}</div>
+                          <div className={s.accent ? "stat-value-red" : "stat-value"}>{s.value}</div>
                         </div>
                       </div>
                     ))}
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -308,40 +300,35 @@ export default function Dashboard() {
               {/* Requires attention */}
               <div className="gov-card" style={{ overflow: "hidden" }}>
                 <div className="gov-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span>Requires Immediate Attention</span>
-                  <span style={{ background: "var(--color-orange-400)", color: "white", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 700 }}>
-                    {3}
-                  </span>
+                  <span>⚠️ Immediate Attention</span>
+                  <span style={{ background: "var(--color-orange-400)", color: "white", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 800, boxShadow: "0 2px 8px rgba(247,164,29,0.4)" }}>3</span>
                 </div>
-                <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
                   {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 3).map((p, i) => {
                     const risk = p.risk_score || 0;
-                    const issue = p.risk_level === 'Critical' || p.risk_level === 'High' ? "Requires attention" : "Monitored project";
+                    const isHigh = risk >= 80;
                     return (
                     <div
                       key={p.project_id}
+                      className={`risk-attention-card animate-fade-in-up delay-${(i + 1) * 100}`}
                       style={{
-                        background: risk >= 80 ? "var(--color-risk-high-bg)" : "var(--color-risk-medium-bg)",
-                        border: `1px solid ${risk >= 80 ? "var(--color-risk-high-border)" : "var(--color-risk-medium-border)"}`,
-                        borderLeft: `4px solid ${risk >= 80 ? "var(--color-risk-high)" : "var(--color-risk-medium)"}`,
-                        borderRadius: 6, padding: "10px 12px", cursor: "pointer",
-                        transition: "box-shadow 0.15s",
+                        background: isHigh ? "linear-gradient(135deg, #fff5f5, #ffe8e8)" : "linear-gradient(135deg, #fffaf0, #fef3e0)",
+                        border: `1px solid ${isHigh ? "var(--color-risk-high-border)" : "var(--color-risk-medium-border)"}`,
+                        borderLeft: `4px solid ${isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)"}`,
                       }}
                       onClick={() => navigate(`/projects/${p.project_id}`)}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "none"}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 4 }}>
-                        <div className="flex-1 truncate">
-                          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.72rem" }}>{p.project_id}</span>
-                          <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)", marginTop: 1 }} className="truncate" title={p.project_name}>{p.project_name}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.68rem", background: "var(--color-navy-50)", padding: "1px 6px", borderRadius: 4, border: "1px solid var(--color-navy-100)" }}>{p.project_id}</span>
+                          <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)", marginTop: 4, lineHeight: 1.3 }} className="truncate" title={p.project_name}>{p.project_name}</div>
                         </div>
-                        <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1rem", color: risk >= 80 ? "var(--color-risk-high)" : "var(--color-risk-medium)", flexShrink: 0 }}>
-                          {risk}
-                        </span>
+                        <div style={{ flexShrink: 0, textAlign: "center" }}>
+                          <div style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1.2rem", color: isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)", lineHeight: 1 }}>{risk}</div>
+                          <div style={{ fontSize: "0.55rem", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Score</div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }}>📍 {p.state}</div>
-                      <div style={{ fontSize: "0.7rem", color: risk >= 80 ? "var(--color-risk-high)" : "var(--color-risk-medium)", marginTop: 4, fontWeight: 500 }}>⚠ {issue}</div>
+                      <div style={{ fontSize: "0.68rem", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 4 }}>📍 {p.state}</div>
                     </div>
                     )
                   })}
@@ -350,29 +337,22 @@ export default function Dashboard() {
 
               {/* Quick links */}
               <div className="gov-card" style={{ overflow: "hidden" }}>
-                <div className="gov-card-header">Quick Navigation</div>
-                <div style={{ padding: "8px 8px" }}>
+                <div className="gov-card-header">⚡ Quick Navigation</div>
+                <div style={{ padding: "8px" }}>
                   {[
                     { label: "View Project Map", path: "/map", icon: "🗺️" },
                     { label: "Pending Inspections", path: "/inspections", icon: "📋" },
                     { label: "Recent Evidence", path: "/evidence", icon: "📸" },
                     { label: "Citizen Reports", path: "/report", icon: "🚩" },
-                  ].map(a => (
+                  ].map((a, i) => (
                     <button
                       key={a.label}
                       onClick={() => navigate(a.path)}
-                      style={{
-                        width: "100%", display: "flex", alignItems: "center", gap: 10,
-                        padding: "9px 10px", cursor: "pointer", background: "transparent",
-                        border: "none", borderBottom: "1px solid var(--color-border-light)",
-                        textAlign: "left", transition: "background 0.12s",
-                      }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--color-navy-50)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                      className="quick-nav-btn"
                     >
-                      <span style={{ fontSize: "1rem" }}>{a.icon}</span>
-                      <span style={{ fontSize: "0.8rem", color: "var(--color-navy-700)", fontWeight: 500 }}>{a.label}</span>
-                      <span style={{ marginLeft: "auto", color: "var(--color-navy-400)", fontSize: "0.75rem" }}>›</span>
+                      <div className="nav-icon">{a.icon}</div>
+                      <span style={{ fontSize: "0.8rem", color: "var(--color-navy-700)", fontWeight: 600 }}>{a.label}</span>
+                      <span style={{ marginLeft: "auto", color: "var(--color-navy-400)", fontSize: "0.85rem", fontWeight: 700 }}>›</span>
                     </button>
                   ))}
                 </div>
@@ -380,22 +360,36 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ===== ACTIVITY FEED ===== */}
-          <div className="gov-card" style={{ overflow: "hidden" }}>
-            <div className="gov-card-header">Recent Activity</div>
+          {/* ACTIVITY FEED */}
+          <div className="gov-card animate-fade-in-up delay-400" style={{ overflow: "hidden" }}>
+            <div className="gov-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="live-dot" />
+              Recent Activity
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
               {[
-                { action: "Inspection completed", project: "DR-0001", time: "2h ago", color: "var(--color-risk-low)", bg: "var(--color-risk-low-bg)" },
-                { action: "New evidence uploaded", project: "#7192", time: "4h ago", color: "var(--color-navy-500)", bg: "var(--color-navy-50)" },
-                { action: "Risk score updated", project: "#3347", time: "6h ago", color: "var(--color-risk-medium)", bg: "var(--color-risk-medium-bg)" },
-                { action: "Citizen report received", project: "#5518", time: "Yesterday", color: "#718096", bg: "#f7fafc" },
+                { action: "Inspection completed", project: "DR-0001", time: "2h ago", color: "var(--color-risk-low)", icon: "✅" },
+                { action: "New evidence uploaded", project: "#7192", time: "4h ago", color: "var(--color-navy-500)", icon: "📸" },
+                { action: "Risk score updated", project: "#3347", time: "6h ago", color: "var(--color-risk-medium)", icon: "📊" },
+                { action: "Citizen report received", project: "#5518", time: "Yesterday", color: "#718096", icon: "🚩" },
               ].map((a, i) => (
-                <div key={i} style={{ padding: "14px 18px", borderRight: i < 3 ? "1px solid var(--color-border-light)" : "none", display: "flex", gap: 10 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: a.color, flexShrink: 0, marginTop: 5 }} />
+                <div
+                  key={i}
+                  style={{
+                    padding: "16px 18px",
+                    borderRight: i < 3 ? "1px solid rgba(220,232,245,0.5)" : "none",
+                    display: "flex", gap: 12,
+                    transition: "background 0.15s",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(238,244,251,0.6)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--color-navy-50)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", flexShrink: 0 }}>{a.icon}</div>
                   <div>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 500, color: "var(--color-text-secondary)" }}>{a.action}</div>
-                    <div style={{ fontSize: "0.7rem", color: "var(--color-navy-500)", fontWeight: 600, marginTop: 2 }}>{a.project}</div>
-                    <div style={{ fontSize: "0.68rem", color: "var(--color-text-muted)", marginTop: 1 }}>{a.time}</div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>{a.action}</div>
+                    <div style={{ fontSize: "0.7rem", color: a.color, fontWeight: 700, marginTop: 3 }}>{a.project}</div>
+                    <div style={{ fontSize: "0.66rem", color: "var(--color-text-muted)", marginTop: 2 }}>{a.time}</div>
                   </div>
                 </div>
               ))}
