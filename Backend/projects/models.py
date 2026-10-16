@@ -67,6 +67,7 @@ class Project(models.Model):
     
     # Verification
     verification_status = models.CharField(max_length=50, choices=VERIFICATION_STATUSES, default='NOT_REVIEWED', db_index=True)
+    is_public = models.BooleanField(default=False, db_index=True)
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)

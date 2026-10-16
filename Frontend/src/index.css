@@ -1,4 +1,4 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -380,3 +380,34 @@ body {
 .user-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--color-navy-700),var(--color-navy-500)); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.72rem; color:white; box-shadow:0 2px 8px rgba(26,48,104,.25); }
 
 .skeleton { background:linear-gradient(90deg,#e2e8f0 0%,#edf2f7 50%,#e2e8f0 100%); background-size:400px 100%; animation:shimmer 1.4s infinite; border-radius:var(--radius-sm); }
+
+/* ── Landing page responsive helpers ── */
+@keyframes gradient { 0%,100% { background-position:0% 50%; } 50% { background-position:100% 50%; } }
+
+@media (max-width: 900px) {
+  /* Editorial two-column → single column */
+  #about > div > div { grid-template-columns: 1fr !important; gap: 40px !important; }
+  /* Footer three-column → single column */
+  footer > div > div:first-child { grid-template-columns: 1fr !important; gap: 32px !important; }
+}
+
+@media (max-width: 768px) {
+  /* Show mobile menu button */
+  .landing-mobile-menu-btn { display: flex !important; }
+  /* Hide desktop nav on narrow */
+  header nav { display: none !important; }
+  /* Stats strip — 2 cols on mobile */
+  #stat-total, #stat-assessed, #stat-pending, #stat-high {
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+  /* Hero padding */
+  .hero-content { padding: 64px 20px 48px !important; }
+}
+
+@media (max-width: 480px) {
+  /* Stats 1-col on very small */
+  section[aria-label="Monitoring snapshot"] > div > div {
+    grid-template-columns: 1fr !important;
+  }
+}

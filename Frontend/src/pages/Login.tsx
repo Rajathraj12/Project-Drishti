@@ -15,8 +15,9 @@ export default function Login() {
     setLoading(true)
     setError("")
     try {
-      await login({ username: email, password })
-      navigate("/dashboard")
+      const loggedIn = await login({ username: email, password })
+      const { landingPath } = await import('../permissions/rbac')
+      navigate(landingPath(loggedIn.role))
     } catch (err: any) {
       setError(err.message || "Invalid credentials or server error")
     } finally {

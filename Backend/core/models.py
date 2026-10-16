@@ -22,6 +22,18 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.role})"
 
+
+class ProjectAssignment(models.Model):
+    """Explicit project assignment for field officers and implementing agencies."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='project_assignments')
+    project_id = models.CharField(max_length=100, db_index=True)
+
+    class Meta:
+        unique_together = ('user', 'project_id')
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.project_id}"
+
 class AuditEvent(models.Model):
     EVENT_TYPES = (
         ('PROJECT_CREATED', 'Project Created'),

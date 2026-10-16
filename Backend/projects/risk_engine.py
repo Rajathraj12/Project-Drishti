@@ -63,6 +63,7 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
             "rule_id": "COST_OVERRUN",
             "title": "Cost Overrun",
             "severity": "High",
+            "points": CONFIG["WEIGHT_COST_OVERRUN"],
             "description": f"Revised cost exceeds original cost by {pct_overrun:.1f}%.",
             "observed_values": {"original": original_cost, "revised": revised_cost},
             "threshold": f"> {original_cost}"
@@ -75,6 +76,7 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
             "rule_id": "LOW_PROGRESS",
             "title": "Low Physical Progress",
             "severity": "Medium",
+            "points": CONFIG["WEIGHT_LOW_PROGRESS"],
             "description": f"Physical progress ({reported_progress}%) is critically low.",
             "observed_values": {"progress": reported_progress},
             "threshold": f"< {CONFIG['LOW_PROGRESS_THRESHOLD']}%"
@@ -89,6 +91,7 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
                 "rule_id": "UTILIZATION_MISMATCH",
                 "title": "Utilization-Progress Mismatch",
                 "severity": "High",
+                "points": CONFIG["WEIGHT_UTILIZATION_MISMATCH"],
                 "description": f"Financial utilization ({financial_utilization:.1f}%) significantly exceeds physical progress ({reported_progress}%).",
                 "observed_values": {"utilization": round(financial_utilization, 2), "progress": reported_progress},
                 "threshold": f"Difference > {CONFIG['UTILIZATION_MISMATCH_THRESHOLD']}%"
@@ -102,6 +105,7 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
                 "rule_id": "HIGH_EXPENDITURE_LOW_PROGRESS",
                 "title": "High Expenditure, Low Progress",
                 "severity": "Critical",
+                "points": CONFIG["WEIGHT_HIGH_EXPENDITURE"],
                 "description": f"High expenditure ({financial_utilization:.1f}%) but progress is stalled ({reported_progress}%).",
                 "observed_values": {"utilization": round(financial_utilization, 2), "progress": reported_progress},
                 "threshold": f"Utilization > {CONFIG['HIGH_EXPENDITURE_THRESHOLD']}% & Progress < {CONFIG['HIGH_EXPENDITURE_PROGRESS_MAX']}%"

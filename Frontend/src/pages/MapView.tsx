@@ -5,6 +5,8 @@ import { Project } from "../types"
 import { MapContainer, TileLayer, Marker as LeafletMarker, Popup, CircleMarker, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
+import { useAuth } from "../contexts/AuthContext"
+import { hasCapability } from "../permissions/rbac"
 
 type Marker = {
   id: string
@@ -28,6 +30,8 @@ const riskColor = (r: number) =>
 
 export default function MapView() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canViewRisk = hasCapability(user?.role, "view_internal_risk")
   const [selected, setSelected] = useState<Marker | null>(null)
   const [filters, setFilters] = useState({ risk: "all", state: "All States", sector: "All Types" })
   const [markers, setMarkers] = useState<Marker[]>([])
@@ -98,6 +102,7 @@ export default function MapView() {
 
         {/* Filters */}
         <div className="p-4 border-b border-slate-100 space-y-4">
+          {canViewRisk && (
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Risk Level</label>
             <div className="flex gap-1.5 flex-wrap">
@@ -120,6 +125,7 @@ export default function MapView() {
               ))}
             </div>
           </div>
+          )}
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">State</label>
             <select value={filters.state} onChange={e => setFilters({ ...filters, state: e.target.value })} className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 text-navy-900 outline-none focus:border-navy-500 transition-colors bg-white">
@@ -153,12 +159,14 @@ export default function MapView() {
                     <div className="text-xs font-semibold text-slate-700 mt-0.5 leading-tight">{m.name}</div>
                     <div className="text-[10px] text-slate-500 mt-1">📍 {m.location}</div>
                   </div>
+                  {canViewRisk && (
                   <div
                     className="font-mono font-bold text-xs px-2 py-0.5 rounded flex-shrink-0 border"
                     style={{ color: rc.bg, backgroundColor: rc.light, borderColor: rc.bg }}
                   >
                     {m.risk}
                   </div>
+                  )}
                 </div>
                 <div className="mt-3 bg-slate-200 rounded-full h-1.5">
                   <div
@@ -173,6 +181,7 @@ export default function MapView() {
         </div>
 
         {/* Legend */}
+        {canViewRisk && (
         <div className="p-4 border-t border-slate-200 bg-white">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Legend</div>
           <div className="space-y-2">
@@ -188,6 +197,7 @@ export default function MapView() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       {/* Map area */}
@@ -221,6 +231,7 @@ export default function MapView() {
         </MapContainer>
 
         {/* Map overlay stats */}
+        {canViewRisk && (
         <div style={{ position: "absolute", top: 16, left: 16, zIndex: 10 }} className="glass-panel">
           <div style={{ padding: "14px 18px" }}>
             <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-navy-800)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
@@ -242,6 +253,7 @@ export default function MapView() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Selected project popup */}
         {selected && (
@@ -252,12 +264,14 @@ export default function MapView() {
                 <div className="font-display font-bold text-navy-900 text-base mt-1">{selected.name}</div>
                 <div className="text-sm text-slate-600 mt-1 font-medium">📍 {selected.location}</div>
               </div>
+              {canViewRisk && (
               <div
                 className="font-mono font-bold text-xl px-3 py-1.5 rounded-lg flex-shrink-0 border"
                 style={{ color: riskColor(selected.risk).bg, backgroundColor: riskColor(selected.risk).light, borderColor: riskColor(selected.risk).bg }}
               >
                 {selected.risk}
               </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-5">

@@ -1,63 +1,71 @@
-import { useState } from "react"
 import { Outlet, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
+import { canAccessPath, landingPath, ROLES, visibleNavItems } from "../permissions/rbac"
+import Forbidden from "../pages/Forbidden"
 
-const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: GridIcon },
-  { label: "Projects", path: "/projects", icon: LayersIcon },
-  { label: "Map View", path: "/map", icon: MapIcon },
-  { label: "Inspections", path: "/inspections", icon: ClipboardIcon },
-  { label: "Evidence", path: "/evidence", icon: ShieldIcon },
-  { label: "Contractors", path: "/contractors", icon: BuildingIcon },
-]
+const iconByPath: Record<string, typeof GridIcon> = {
+  "/dashboard": GridIcon,
+  "/projects": LayersIcon,
+  "/map": MapIcon,
+  "/actions": CheckCircleIcon,
+  "/inspections": ClipboardIcon,
+  "/evidence": ShieldIcon,
+  "/contractors": BuildingIcon,
+  "/reports": ClipboardIcon,
+  "/risk-analysis": ShieldIcon,
+  "/report": ClipboardIcon,
+  "/admin": BuildingIcon,
+}
 
 export default function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, isDevBypass, devRole, setDevRole } = useAuth()
+  const { user, logout, isDevBypass, devRole, setDevRole, loading } = useAuth()
 
   const handleLogout = () => {
     logout()
-    navigate("/login")
+    if (!isDevBypass) {
+      navigate("/login")
+    }
   }
 
   const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "U"
+  const navItems = visibleNavItems(user?.role)
+  const pageAllowed = canAccessPath(user?.role, location.pathname)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-surface)" }}>
 
-      {/* DEV BYPASS BANNER */}
       {isDevBypass && (
         <div className="dev-bypass-banner">
-          <span>🛠️ DEVELOPMENT BYPASS ACTIVE</span>
+          <span>🛠️ DEVELOPMENT MODE — RBAC bypass is active</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span>Simulate Role:</span>
             <select
-              value={devRole || "GOVERNMENT_OFFICER"}
-              onChange={(e) => { setDevRole(e.target.value); window.location.reload(); }}
+              value={devRole || user?.role || "GOVERNMENT_OFFICER"}
+              onChange={async (e) => {
+                const role = e.target.value
+                await setDevRole(role)
+                navigate(landingPath(role), { replace: true })
+              }}
               style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #f59e0b", background: "white", fontSize: "0.7rem", cursor: "pointer", fontFamily: "var(--font-sans)", fontWeight: 600 }}
             >
-              <option value="ADMIN">Admin</option>
-              <option value="GOVERNMENT_OFFICER">Government Officer</option>
-              <option value="FIELD_OFFICER">Field Officer</option>
-              <option value="IMPLEMENTING_AGENCY">Implementing Agency</option>
-              <option value="CITIZEN">Citizen</option>
+              {ROLES.map((role) => (
+                <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+              ))}
             </select>
           </div>
         </div>
       )}
 
-      {/* TOP HEADER */}
       <div className="gov-header" style={{ flexShrink: 0 }}>
         <div style={{ maxWidth: "100%", padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
 
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => navigate("/dashboard")}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => navigate(landingPath(user?.role))}>
             <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 44, objectFit: "contain" }} />
             <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--color-navy-900)", letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}>Drishti</span>
           </div>
 
-          {/* Right: live dot + user chip + logout */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 500 }}>
               <span className="live-dot" />
@@ -105,10 +113,23 @@ export default function AppShell() {
         </div>
       </div>
 
-      {/* NAVY NAV BAR */}
       <div className="gov-navbar" style={{ flexShrink: 0, height: 46, display: "flex", alignItems: "center", padding: "0 28px" }}>
+        {/* Home link — always first */}
+        <button
+          onClick={() => navigate("/")}
+          className="nav-link"
+          style={{ background: "none", border: "none", cursor: "pointer", height: 46, gap: 5 }}
+          title="Back to landing page"
+        >
+          <HomeIcon style={{ width: 12, height: 12, opacity: 0.75 }} />
+          Home
+        </button>
+
+        {/* Thin separator */}
+        <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 4px" }} aria-hidden />
+
         {navItems.map(item => {
-          const Icon = item.icon
+          const Icon = iconByPath[item.path] || GridIcon
           const isActive = location.pathname === item.path ||
             (item.path !== "/dashboard" && location.pathname.startsWith(item.path))
           return (
@@ -123,25 +144,21 @@ export default function AppShell() {
             </button>
           )
         })}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
-          <button onClick={() => navigate("/report")} className="nav-link" style={{ background: "none", border: "none", height: 46 }}>
-            Citizen Report
-          </button>
-          <button onClick={() => navigate("/admin")} className="nav-link" style={{ background: "none", border: "none", height: 46 }}>
-            Admin
-          </button>
-        </div>
       </div>
 
-      {/* CONTENT AREA */}
       <main style={{ flex: 1, overflowY: "auto", position: "relative" }}>
-        <Outlet />
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center" }}>Updating permissions...</div>
+        ) : pageAllowed ? (
+          <Outlet />
+        ) : (
+          <Forbidden />
+        )}
       </main>
     </div>
   )
 }
 
-/* ICONS */
 function GridIcon({ style }: { style?: React.CSSProperties }) {
   return <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>
 }
@@ -163,3 +180,10 @@ function BuildingIcon({ style }: { style?: React.CSSProperties }) {
 function LogOutIcon({ style }: { style?: React.CSSProperties }) {
   return <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
 }
+function CheckCircleIcon({ style }: { style?: React.CSSProperties }) {
+  return <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+}
+function HomeIcon({ style }: { style?: React.CSSProperties }) {
+  return <svg style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+}
+

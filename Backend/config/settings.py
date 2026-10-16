@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -19,6 +20,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / '.env')
+
+TESTING = 'test' in sys.argv
 
 
 # Quick-start development settings - unsuitable for production
@@ -28,7 +31,7 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = 'django-insecure-lc2jos(+&7=t+*cr%60ydfo5do-ve5=t2-=q@1s21(ohd6it()'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = ['*']
 
@@ -149,6 +152,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'core.auth_bypass.DevAuthBypassAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -163,8 +169,51 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-import os
 DRISHTI_DEV_AUTH_BYPASS = os.getenv('DRISHTI_DEV_AUTH_BYPASS', 'false').lower() == 'true'
 
 if DRISHTI_DEV_AUTH_BYPASS and not DEBUG:
     raise ValueError("DRISHTI_DEV_AUTH_BYPASS cannot be true when DEBUG is false.")
+
+
+def _env_or_none(name):
+    value = os.getenv(name, '').strip()
+    return value or None
+
+
+def _env_list(name):
+    value = os.getenv(name, '').strip()
+    if not value:
+        return []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+# Jurisdiction for simulated identities. Unset fields fail closed (no records).
+DRISHTI_DEV_BYPASS_PROFILES = {
+    'ADMIN': {
+        'username': os.getenv('DRISHTI_DEV_ADMIN_USERNAME', 'dev_admin'),
+        'state': _env_or_none('DRISHTI_DEV_ADMIN_STATE'),
+        'district': _env_or_none('DRISHTI_DEV_ADMIN_DISTRICT'),
+        'department': _env_or_none('DRISHTI_DEV_ADMIN_DEPARTMENT'),
+    },
+    'GOVERNMENT_OFFICER': {
+        'username': os.getenv('DRISHTI_DEV_GOV_USERNAME', 'dev_government_officer'),
+        'state': _env_or_none('DRISHTI_DEV_GOV_STATE'),
+        'district': _env_or_none('DRISHTI_DEV_GOV_DISTRICT'),
+        'department': _env_or_none('DRISHTI_DEV_GOV_DEPARTMENT'),
+    },
+    'FIELD_OFFICER': {
+        'username': os.getenv('DRISHTI_DEV_FIELD_USERNAME', 'dev_field_officer'),
+        'state': os.getenv('DRISHTI_DEV_FIELD_STATE', 'Punjab') or None,
+        'district': _env_or_none('DRISHTI_DEV_FIELD_DISTRICT'),
+        'department': _env_or_none('DRISHTI_DEV_FIELD_DEPARTMENT'),
+        'assigned_project_ids': _env_list('DRISHTI_DEV_FIELD_PROJECTS'),
+    },
+    'IMPLEMENTING_AGENCY': {
+        'username': os.getenv('DRISHTI_DEV_AGENCY_USERNAME', 'dev_implementing_agency'),
+        'department': os.getenv('DRISHTI_DEV_AGENCY_DEPARTMENT', 'Roads & Highways') or None,
+        'assigned_project_ids': _env_list('DRISHTI_DEV_AGENCY_PROJECTS'),
+    },
+    'CITIZEN': {
+        'username': os.getenv('DRISHTI_DEV_CITIZEN_USERNAME', 'dev_citizen'),
+    },
+}

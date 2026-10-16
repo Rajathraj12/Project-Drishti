@@ -1,0 +1,55 @@
+{
+  "roles": [
+    "ADMIN",
+    "GOVERNMENT_OFFICER",
+    "FIELD_OFFICER",
+    "IMPLEMENTING_AGENCY",
+    "CITIZEN"
+  ],
+  "landings": {
+    "ADMIN": "/dashboard",
+    "GOVERNMENT_OFFICER": "/dashboard",
+    "FIELD_OFFICER": "/dashboard",
+    "IMPLEMENTING_AGENCY": "/projects",
+    "CITIZEN": "/dashboard"
+  },
+  "routes": [
+    { "path": "/admin", "roles": ["ADMIN"] },
+    { "path": "/risk-analysis", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
+    { "path": "/projects/:id/why-flagged", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"] },
+    { "path": "/inspections", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"] },
+    { "path": "/contractors", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
+    { "path": "/contractors/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
+    { "path": "/contractor/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
+    { "path": "/actions", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"] },
+    { "path": "/evidence", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"] },
+    { "path": "/dashboard", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },
+    { "path": "/projects", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },
+    { "path": "/projects/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },
+    { "path": "/map", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },
+    { "path": "/reports", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },
+    { "path": "/report", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] }
+  ],
+  "capabilities": {
+    "view_internal_risk": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "view_ml_assessment": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "run_rule_analysis": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "run_ml_analysis": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "bulk_analyze": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "view_verifications": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "submit_verification": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "view_evidence": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"],
+    "submit_evidence": ["FIELD_OFFICER", "IMPLEMENTING_AGENCY", "ADMIN", "GOVERNMENT_OFFICER"],
+    "view_corrective_actions": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"],
+    "create_corrective_actions": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "close_corrective_actions": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "update_assigned_actions": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"],
+    "manage_users": ["ADMIN"],
+    "write_project": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "create_project": ["ADMIN"],
+    "view_contractors": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "view_inspections": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
+    "view_internal_reports": ["ADMIN", "GOVERNMENT_OFFICER"],
+    "view_public_reports": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"]
+  }
+}

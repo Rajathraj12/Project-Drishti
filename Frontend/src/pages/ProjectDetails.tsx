@@ -2,19 +2,92 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { projectService } from "../services/projectService"
-import { Project } from "../types"
+import { correctiveActionService } from "../services/correctiveActionService"
+import { Project, CorrectiveAction } from "../types"
+import { useAuth } from "../contexts/AuthContext"
+import { canAccessPath, hasCapability } from "../permissions/rbac"
 
-const radarData = [
-  { subject: "Progress", value: 92 },
-  { subject: "Cost", value: 89 },
-  { subject: "Timeline", value: 81 },
-  { subject: "Contractor", value: 72 },
-  { subject: "Evidence", value: 76 },
-]
+const formatCostCr = (val?: number | null) => {
+  if (val == null || isNaN(val)) return "₹0.00 Cr"
+  const cr = val > 100000 ? val / 10000000 : val
+  return `₹${cr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Cr`
+}
+
+const RULE_WEIGHTS: Record<string, number> = {
+  COST_OVERRUN: 35,
+  UTILIZATION_MISMATCH: 30,
+  HIGH_EXPENDITURE_LOW_PROGRESS: 20,
+  LOW_PROGRESS: 15,
+}
+
+const getRulePoints = (r: any): number => {
+  if (r?.points != null && !isNaN(Number(r.points))) return Number(r.points)
+  if (r?.rule_id && RULE_WEIGHTS[r.rule_id]) return RULE_WEIGHTS[r.rule_id]
+  if (r?.severity === "Critical") return 35
+  if (r?.severity === "High") return 25
+  if (r?.severity === "Medium") return 15
+  return 10
+}
+
+const formatObservedValues = (r: any): string => {
+  if (!r?.observed_values) return "No telemetry values recorded"
+  const obs = r.observed_values
+  if (r.rule_id === "COST_OVERRUN" && (obs.original != null || obs.revised != null)) {
+    const orig = obs.original != null ? formatCostCr(obs.original) : "N/A"
+    const rev = obs.revised != null ? formatCostCr(obs.revised) : "N/A"
+    const diff = (obs.revised || 0) - (obs.original || 0)
+    const diffStr = diff > 0 ? ` (+${formatCostCr(diff)} escalation)` : ""
+    return `Sanctioned: ${orig} → Revised: ${rev}${diffStr}`
+  }
+  if (r.rule_id === "LOW_PROGRESS" && obs.progress != null) {
+    return `Reported Physical Progress: ${obs.progress}%`
+  }
+  if (r.rule_id === "UTILIZATION_MISMATCH") {
+    const util = obs.utilization != null ? `${obs.utilization}%` : "N/A"
+    const prog = obs.progress != null ? `${obs.progress}%` : "N/A"
+    const gap = obs.utilization != null && obs.progress != null 
+      ? ` (Gap: ${(obs.utilization - obs.progress).toFixed(1)}%)` 
+      : ""
+    return `Spend Utilization: ${util} vs Physical Progress: ${prog}${gap}`
+  }
+  if (r.rule_id === "HIGH_EXPENDITURE_LOW_PROGRESS") {
+    const util = obs.utilization != null ? `${obs.utilization}%` : "N/A"
+    const prog = obs.progress != null ? `${obs.progress}%` : "N/A"
+    return `High Spend (${util}) with Physical Delivery Stalled at ${prog}`
+  }
+  if (typeof obs === "object") {
+    return Object.entries(obs)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "number" ? v.toLocaleString() : v}`)
+      .join(" • ")
+  }
+  return String(obs)
+}
+
+const getSeverityBadgeClass = (severity?: string) => {
+  switch ((severity || "").toLowerCase()) {
+    case "critical":
+      return "bg-red-50 text-red-700 border-red-200"
+    case "high":
+      return "bg-amber-50 text-amber-800 border-amber-200"
+    case "medium":
+      return "bg-yellow-50 text-yellow-800 border-yellow-200"
+    default:
+      return "bg-emerald-50 text-emerald-700 border-emerald-200"
+  }
+}
 
 export default function ProjectDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user, dataEpoch } = useAuth()
+  const canAnalyze = hasCapability(user?.role, "run_rule_analysis")
+  const canViewRisk = hasCapability(user?.role, "view_internal_risk")
+  const canViewMl = hasCapability(user?.role, "view_ml_assessment")
+  const canVerify = hasCapability(user?.role, "submit_verification")
+  const canViewVerifications = hasCapability(user?.role, "view_verifications")
+  const canViewActions = hasCapability(user?.role, "view_corrective_actions")
+  const canCreateActions = hasCapability(user?.role, "create_corrective_actions")
+  const canViewEvidence = canAccessPath(user?.role, "/evidence")
   const [animated, setAnimated] = useState(false)
   
   const [project, setProject] = useState<Project | null>(null)
@@ -25,6 +98,7 @@ export default function ProjectDetails() {
   const [mlAssessment, setMlAssessment] = useState<any>(null)
   
   const [verifications, setVerifications] = useState<any[]>([])
+  const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([])
   
   // Form State
   const [verifyStatus, setVerifyStatus] = useState("IN_REVIEW")
@@ -32,15 +106,49 @@ export default function ProjectDetails() {
   const [verifyEvidence, setVerifyEvidence] = useState("")
   const [verifyLoading, setVerifyLoading] = useState(false)
 
+  // Phase 7 Quick Create Modal State
+  const [showActionModal, setShowActionModal] = useState(false)
+  const [actionTitle, setActionTitle] = useState("")
+  const [actionDesc, setActionDesc] = useState("")
+  const [actionReason, setActionReason] = useState("")
+  const [actionPriority, setActionPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "CRITICAL">("HIGH")
+  const [actionDueDate, setActionDueDate] = useState(
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+  )
+  const [actionAssignee, setActionAssignee] = useState("")
+  const [actionAgency, setActionAgency] = useState("")
+  const [actionLoading, setActionLoading] = useState(false)
+
   const fetchAssessments = () => {
     if (!id) return;
-    projectService.getProjectRisk(id).then(setAnalysisResult).catch(() => setAnalysisResult(null));
-    projectService.getProjectMlRisk(id).then(setMlAssessment).catch(() => setMlAssessment(null));
+    if (canViewRisk) {
+      projectService.getProjectRisk(id).then(setAnalysisResult).catch(() => setAnalysisResult(null));
+    } else {
+      setAnalysisResult(null);
+    }
+    if (canViewMl) {
+      projectService.getProjectMlRisk(id).then(setMlAssessment).catch(() => setMlAssessment(null));
+    } else {
+      setMlAssessment(null);
+    }
   }
   
   const fetchVerifications = () => {
     if (!id) return;
+    if (!canViewVerifications) {
+      setVerifications([]);
+      return;
+    }
     projectService.getVerifications(id).then(setVerifications).catch(() => setVerifications([]));
+  }
+
+  const fetchCorrectiveActions = () => {
+    if (!id) return;
+    if (!canViewActions) {
+      setCorrectiveActions([]);
+      return;
+    }
+    correctiveActionService.getProjectActions(id).then(res => setCorrectiveActions(res.results || [])).catch(() => setCorrectiveActions([]));
   }
 
   const handleAnalyze = async () => {
@@ -76,6 +184,37 @@ export default function ProjectDetails() {
     setVerifyLoading(false);
   }
 
+  const handleCreateAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !actionTitle || !actionDesc || !actionReason) return;
+    setActionLoading(true);
+    try {
+      await correctiveActionService.createAction({
+        project_id: id,
+        title: actionTitle,
+        description: actionDesc,
+        reason: actionReason,
+        priority: actionPriority,
+        due_date: actionDueDate,
+        assigned_to: actionAssignee || undefined,
+        assigned_agency: actionAgency || undefined,
+        risk_assessment_id: analysisResult?.assessment_id || undefined,
+        ml_assessment_id: mlAssessment?.assessment_id || undefined,
+        verification_id: verifications[0]?.verification_id || undefined,
+        evidence_ids: verifications[0]?.evidence_references || undefined,
+      });
+      setShowActionModal(false);
+      setActionTitle("");
+      setActionDesc("");
+      setActionReason("");
+      fetchCorrectiveActions();
+    } catch (err: any) {
+      alert(err?.message || "Failed to create corrective action");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100)
     if (id) {
@@ -88,30 +227,83 @@ export default function ProjectDetails() {
       })
       fetchAssessments();
       fetchVerifications();
+      fetchCorrectiveActions();
     }
     return () => clearTimeout(t)
-  }, [id])
+  }, [id, dataEpoch, canViewRisk, canViewMl, canViewVerifications, canViewActions])
   
-  if (loading) return <div className="p-6">Loading project...</div>;
-  if (!project) return <div className="p-6">Project not found</div>;
+  if (loading) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-navy-700 mb-3" />
+        <div className="text-sm font-semibold">Loading official project data...</div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="p-8 max-w-[800px] mx-auto text-center mt-12">
+        <div className="bg-white p-8 border border-amber-200 bg-amber-50/40 rounded-xl shadow-sm">
+          <div className="text-4xl mb-3">🛡️</div>
+          <h2 className="text-lg font-bold text-navy-900 mb-2">Project Inaccessible or Outside Jurisdiction</h2>
+          <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-[550px] mx-auto">
+            Project <span className="font-mono font-bold text-navy-800">#{id}</span> is not accessible under your current active role (<strong>{user?.role?.replace(/_/g, " ") || "Officer"}</strong>).
+            {user?.state && <span> Your jurisdictional scope is limited to <strong>{user.state}</strong> infrastructure records.</span>}
+          </p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="px-4 py-2 bg-navy-800 text-white rounded-lg text-xs font-600 hover:bg-navy-700 transition"
+            >
+              ← Back to Dashboard
+            </button>
+            <button
+              onClick={() => navigate("/projects")}
+              className="px-4 py-2 border border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-600 hover:bg-slate-50 transition"
+            >
+              View Accessible Projects
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Derive Unified Risk State
-  const ruleFlag = analysisResult?.risk_score >= 40;
+  const ruleFlag = (analysisResult?.risk_score ?? 0) >= 40;
   const mlFlag = mlAssessment?.anomaly_flag === true;
   let unifiedState = "Neither Flagged";
-  let stateColor = "bg-green-100 text-green-800 border-green-200";
+  let statePillStyle = "bg-emerald-50 text-emerald-800 border-emerald-200";
+  let stateDotStyle = "bg-emerald-500";
+  let stateColor = "bg-emerald-100 text-emerald-800 border-emerald-200";
+
   if (ruleFlag && mlFlag) {
     unifiedState = "Both Flagged (Rule + ML)";
+    statePillStyle = "bg-red-50 text-red-800 border-red-300 shadow-xs";
+    stateDotStyle = "bg-red-500 animate-pulse";
     stateColor = "bg-red-100 text-red-800 border-red-200";
   } else if (ruleFlag && !mlFlag) {
     unifiedState = "Rule Risk Flagged Only";
-    stateColor = "bg-orange-100 text-orange-800 border-orange-200";
+    statePillStyle = "bg-amber-50 text-amber-800 border-amber-300";
+    stateDotStyle = "bg-amber-500";
+    stateColor = "bg-amber-100 text-amber-800 border-amber-200";
   } else if (!ruleFlag && mlFlag) {
     unifiedState = "ML Anomaly Flagged Only";
-    stateColor = "bg-amber-100 text-amber-800 border-amber-200";
+    statePillStyle = "bg-purple-50 text-purple-800 border-purple-300";
+    stateDotStyle = "bg-purple-500 animate-pulse";
+    stateColor = "bg-purple-100 text-purple-800 border-purple-200";
   }
-  if (!analysisResult || !mlAssessment) {
+  
+  if (!analysisResult && !mlAssessment) {
     unifiedState = "Not Fully Assessed";
+    statePillStyle = "bg-slate-100 text-slate-700 border-slate-200";
+    stateDotStyle = "bg-slate-400";
+    stateColor = "bg-slate-100 text-slate-800 border-slate-200";
+  } else if (!analysisResult || (canViewMl && !mlAssessment)) {
+    unifiedState = "Partially Assessed";
+    statePillStyle = "bg-slate-100 text-slate-700 border-slate-200";
+    stateDotStyle = "bg-slate-400";
     stateColor = "bg-slate-100 text-slate-800 border-slate-200";
   }
 
@@ -134,8 +326,8 @@ export default function ProjectDetails() {
               <span className="font-mono font-700 text-sm text-navy-800 bg-navy-50 px-2.5 py-1 rounded-lg">
                 Project #{project.project_id}
               </span>
-              <span className={`text-xs font-600 px-2.5 py-1 rounded-full border ${project.data_source_type === 'SYNTHETIC_DEMO' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                {project.data_source_type === 'SYNTHETIC_DEMO' ? 'Synthetic Demo' : 'Official Data'}
+              <span className="text-xs font-600 px-2.5 py-1 rounded-full border bg-green-50 text-green-700 border-green-200">
+                Official Data
               </span>
             </div>
             <h1 className="font-display font-700 text-2xl text-navy-900">{project.project_name}</h1>
@@ -150,19 +342,23 @@ export default function ProjectDetails() {
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
+            {canAnalyze && (
             <button
               onClick={handleAnalyze}
               disabled={analysisLoading}
               className={`text-sm border border-slate-200 text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-50 font-500 transition-colors ${analysisLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {analysisLoading ? "Running Phase 3 & 4..." : "Trigger Full Analysis"}
+              {analysisLoading ? "Running Risk & ML Engine..." : "Trigger Full Analysis"}
             </button>
+            )}
+            {canViewEvidence && (
             <button
               onClick={() => navigate("/evidence")}
               className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg hover:bg-navy-700 font-500 transition-colors"
             >
               View Evidence
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -170,11 +366,11 @@ export default function ProjectDetails() {
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: "Original Cost", value: `₹${(project.original_cost / 10000000).toFixed(2)} Cr`, sub: "Allocated", color: "text-slate-800" },
-          { label: "Revised Cost", value: `₹${((project.revised_cost || project.original_cost) / 10000000).toFixed(2)} Cr`, sub: "Latest", color: "text-slate-800" },
-          { label: "Spent", value: `₹${(project.expenditure / 10000000).toFixed(2)} Cr`, sub: `${project.financial_utilization_pct?.toFixed(1) || 0}% of revised budget`, color: "text-risk-high" },
-          { label: "Cost Overrun", value: `₹${(((project.revised_cost || project.original_cost) - (project.original_cost || 0)) / 10000000).toFixed(2)} Cr`, sub: `${project.cost_deviation_pct?.toFixed(1) || 0}% deviation`, color: "text-risk-medium" },
-          { label: "Reported Progress", value: `${project.reported_progress || 0}%`, sub: "Physical completion", color: "text-accent-500" },
+          { label: "Original Sanction", value: formatCostCr(project.original_cost_cr ?? project.original_cost), sub: "Initial Allocation", color: "text-slate-800" },
+          { label: "Revised Cost", value: formatCostCr(project.revised_cost_cr ?? project.revised_cost ?? project.original_cost), sub: "Latest Approved", color: "text-slate-800" },
+          { label: "Cumulative Spent", value: project.expenditure != null ? formatCostCr(project.expenditure_cr ?? project.expenditure) : "Restricted", sub: project.expenditure != null ? `${project.financial_utilization_pct?.toFixed(1) || 0}% of budget` : "Internal Oversight", color: "text-risk-high" },
+          { label: "Cost Overrun", value: project.expenditure != null ? ((project.cost_overrun_cr || 0) > 0 ? `+${formatCostCr(project.cost_overrun_cr)}` : "None") : "Restricted", sub: `${project.cost_deviation_pct?.toFixed(1) || 0}% deviation`, color: "text-risk-medium" },
+          { label: "Reported Progress", value: `${project.reported_progress_pct ?? project.reported_progress ?? 0}%`, sub: "Physical completion", color: "text-accent-500" },
         ].map((s, i) => (
           <div
             key={s.label}
@@ -188,124 +384,444 @@ export default function ProjectDetails() {
         ))}
       </div>
 
-      {/* Unified Project Risk-Inspection View */}
-      <div className={`bg-white rounded-xl border border-slate-200 p-6 transition-all duration-500 delay-100 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-          <h2 className="font-display font-700 text-navy-900 text-xl">Unified Risk Inspection View</h2>
-          <div className={`px-4 py-1.5 rounded-full border text-sm font-bold ${stateColor}`}>
-            {unifiedState}
+      {/* Comprehensive Financial Budget & Expenditure Ledger */}
+      <div className={`bg-white rounded-xl border border-slate-200 p-6 transition-all duration-500 delay-75 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">💰</span>
+              <h2 className="font-display font-700 text-navy-900 text-lg">Financial Budget & Expenditure Ledger</h2>
+              <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                Official MoSPI Data
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Sanctioned allocations, approved revisions, cumulative expenditure, and delivery velocity tracking.
+            </p>
           </div>
+          {project.source_url && (
+            <a
+              href={project.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-600 text-navy-700 hover:text-navy-900 bg-navy-50 hover:bg-navy-100 px-3 py-1.5 rounded-lg border border-navy-200 transition flex items-center gap-1.5 w-fit"
+            >
+              <span>📄 View MoSPI PAIMANA Flash Report</span>
+              <span>↗</span>
+            </a>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Phase 3 Rule-Based Panel */}
-          <div className="border border-slate-200 rounded-lg p-5">
-            <h3 className="font-600 text-slate-800 border-b pb-3 mb-4 flex justify-between">
-              <span>Phase 3: Rule-Based Engine</span>
-              <span className="font-mono text-sm text-slate-500">v{analysisResult?.rule_engine_version || "N/A"}</span>
-            </h3>
-            
-            {analysisResult ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Risk Score</div>
-                    <div className="text-3xl font-display font-800 text-navy-900">{analysisResult.risk_score}<span className="text-lg text-slate-400">/100</span></div>
-                  </div>
-                  <div className={`px-3 py-1 text-xs font-bold rounded uppercase ${analysisResult.risk_level === 'Critical' ? 'bg-red-100 text-red-800' : analysisResult.risk_level === 'High' ? 'bg-orange-100 text-orange-800' : analysisResult.risk_level === 'Medium' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
-                    {analysisResult.risk_level} Risk
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Column 1: Cost Allocations */}
+          <div className="space-y-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Budget Allocations</div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-500">Original Sanction:</span>
+              <span className="font-mono font-bold text-navy-900">{formatCostCr(project.original_cost_cr ?? project.original_cost)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-500">Latest Approved Revision:</span>
+              <span className="font-mono font-bold text-navy-900">{formatCostCr(project.revised_cost_cr ?? project.revised_cost ?? project.original_cost)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
+              <span className="text-slate-500">Cost Escalation:</span>
+              <span className={`font-mono font-bold ${(project.cost_overrun_cr || 0) > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+                {(project.cost_overrun_cr || 0) > 0 ? `+${formatCostCr(project.cost_overrun_cr)}` : "None (Within Budget)"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-xs text-slate-400">
+              <span>Deviation from Original:</span>
+              <span className="font-mono font-semibold text-slate-600">
+                {project.cost_deviation_pct ? `${project.cost_deviation_pct.toFixed(2)}%` : "0.00%"}
+              </span>
+            </div>
+          </div>
 
-                <div className="space-y-3 mt-4">
-                  <div className="text-xs font-bold text-slate-600 uppercase">Triggered Rules:</div>
-                  {analysisResult.rules_triggered?.length === 0 ? (
-                    <div className="text-sm text-slate-500 bg-slate-50 p-3 rounded">No rules triggered.</div>
-                  ) : (
-                    analysisResult.rules_triggered?.map((r: any, i: number) => (
-                      <div key={i} className="bg-slate-50 p-3 rounded border text-sm border-slate-100">
-                        <div className="flex justify-between font-bold text-slate-700 mb-1">
-                          <span>{r.rule_id}: {r.title}</span>
-                          <span className="text-risk-high">+{r.points} pts</span>
-                        </div>
-                        <div className="text-slate-600 mb-2">{r.description}</div>
-                        <div className="text-xs font-mono text-slate-500">
-                          Threshold: {r.threshold} | Observed: {JSON.stringify(r.observed_values)}
-                        </div>
-                      </div>
-                    ))
-                  )}
+          {/* Column 2: Expenditure & Balances */}
+          <div className="space-y-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+            <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Expenditure & Balances</div>
+            {project.expenditure != null ? (
+              <>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Cumulative Spent:</span>
+                  <span className="font-mono font-bold text-navy-900">{formatCostCr(project.expenditure_cr ?? project.expenditure)}</span>
                 </div>
-              </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Unspent Balance:</span>
+                  <span className="font-mono font-bold text-emerald-800">
+                    {formatCostCr(((project.revised_cost || project.original_cost) || 0) - ((project.expenditure || 0)))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
+                  <span className="text-slate-500">Budget Utilization Rate:</span>
+                  <span className="font-mono font-bold text-navy-900">
+                    {project.financial_utilization_pct ? `${project.financial_utilization_pct.toFixed(1)}%` : "0.0%"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-400">
+                  <span>Spend-to-Progress Velocity:</span>
+                  <span className="font-mono font-semibold text-slate-600">
+                    {project.expenditure_progress_ratio ? `${project.expenditure_progress_ratio.toFixed(2)}x` : "1.00x"}
+                  </span>
+                </div>
+              </>
             ) : (
-              <div className="text-sm text-slate-500 py-10 text-center">No Rule-Based Assessment available.</div>
+              <div className="py-6 text-center text-xs text-slate-400">
+                Detailed internal expenditures are restricted to authorized oversight officers.
+              </div>
             )}
           </div>
 
-          {/* Phase 4 ML Anomaly Panel */}
-          <div className="border border-slate-200 rounded-lg p-5">
-            <h3 className="font-600 text-slate-800 border-b pb-3 mb-4 flex justify-between">
-              <span>Phase 4: ML Isolation Forest</span>
-              <span className="font-mono text-sm text-slate-500">v{mlAssessment?.model_version || "N/A"}</span>
-            </h3>
-            
-            {mlAssessment ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
+          {/* Column 3: Physical Delivery vs Financial Burn */}
+          <div className="space-y-3 bg-slate-50/70 p-4 rounded-xl border border-slate-100 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Delivery Benchmark</div>
+              <div className="space-y-3 mb-3">
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span className="text-slate-600">Physical Progress</span>
+                    <span className="text-navy-900 font-mono">{project.reported_progress_pct ?? project.reported_progress ?? 0}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-navy-800 h-2 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.min(100, project.reported_progress_pct ?? project.reported_progress ?? 0)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {project.expenditure != null && (
                   <div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wide">Anomaly Score</div>
-                    <div className="text-3xl font-display font-800 text-navy-900">{mlAssessment.ml_anomaly_score ?? "N/A"}</div>
-                    <div className="text-[10px] text-slate-400 mt-1">Lower = More anomalous</div>
-                  </div>
-                  <div className={`px-3 py-1 text-xs font-bold rounded uppercase ${mlAssessment.anomaly_status === 'INSUFFICIENT_DATA' ? 'bg-slate-100 text-slate-600' : mlAssessment.anomaly_flag ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
-                    {mlAssessment.anomaly_status === 'INSUFFICIENT_DATA' ? "Insufficient Data" : mlAssessment.anomaly_flag ? "Anomalous" : "Normal"}
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-100 rounded p-3 text-sm text-blue-900 mt-4 leading-relaxed">
-                  <strong>Contextual Explanation: </strong> 
-                  {mlAssessment.explanation || "No explanation provided."}
-                  <div className="text-[10px] mt-2 opacity-70">Note: Isolation Forest flags multidimensional outliers but does not establish causality or proof of misconduct.</div>
-                </div>
-
-                {mlAssessment.data_quality_warnings?.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-100 rounded p-3 text-sm text-amber-900 mt-2">
-                    <strong>Warnings: </strong> 
-                    {mlAssessment.data_quality_warnings.map((w: string, i: number) => <div key={i}>{w}</div>)}
+                    <div className="flex justify-between text-xs font-semibold mb-1">
+                      <span className="text-slate-600">Financial Burn Rate</span>
+                      <span className="text-orange-700 font-mono">{project.financial_utilization_pct ? `${project.financial_utilization_pct.toFixed(1)}%` : "0%"}</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div
+                        className="bg-orange-500 h-2 rounded-full transition-all duration-700"
+                        style={{ width: `${Math.min(100, project.financial_utilization_pct || 0)}%` }}
+                      />
+                    </div>
                   </div>
                 )}
-                
-                <div className="text-xs text-slate-500 font-mono mt-4">
-                  Features used: {mlAssessment.features_used?.join(', ') || 'None'}
-                </div>
               </div>
-            ) : (
-              <div className="text-sm text-slate-500 py-10 text-center">No ML Assessment available.</div>
-            )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-500 flex justify-between items-center">
+              <span>Source Document:</span>
+              <span className="font-semibold text-slate-700 truncate max-w-[170px]" title={project.source_reference}>
+                {project.source_reference || "PAIMANA Flash Report"}
+              </span>
+            </div>
           </div>
-        </div>
-        
-        {/* Investigation Summary */}
-        <div className="mt-6 bg-slate-50 p-5 rounded-lg border border-slate-200">
-          <h3 className="font-600 text-navy-900 text-sm mb-2">Investigation Summary</h3>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            {unifiedState === "Both Flagged (Rule + ML)" ? 
-              "This project triggered hard deterministic rules and exhibits highly anomalous structural patterns relative to the official reference dataset. Human review is strongly recommended to verify physical progress and expenditure." : 
-             unifiedState === "Rule Risk Flagged Only" ? 
-              "This project violated deterministic policy thresholds but its multi-dimensional progression is relatively common in the dataset. Verify the specific rule violations." : 
-             unifiedState === "ML Anomaly Flagged Only" ? 
-              "This project passed deterministic policy thresholds but exhibits unusual multidimensional progression (e.g. expenditure/progress gaps). Review as a potential emerging outlier." : 
-             unifiedState === "Neither Flagged" ? 
-              "This project shows normal progression patterns and passes all policy thresholds. No immediate action required." : 
-              "Assessment data is incomplete. Ensure financial and physical progress values are properly reported."
-            }
-          </p>
         </div>
       </div>
 
+      {/* Unified Project Risk-Inspection View */}
+      {(canViewRisk || canViewMl) && (
+      <div className={`gov-card transition-all duration-500 delay-100 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        {/* Gov-card Header */}
+        <div className="gov-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">🛡️</span>
+            <div>
+              <div className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                Unified Risk Inspection View
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-orange-200 border border-white/20">
+                  DUAL-ENGINE INTEL
+                </span>
+              </div>
+              <div className="text-[11px] text-white/70 font-normal">
+                Phase 3 Rule Determinism & Phase 4 Unsupervised Isolation Forest Assessment
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 shadow-2xs ${statePillStyle}`}>
+              <span className={`w-2 h-2 rounded-full ${stateDotStyle}`} />
+              <span>{unifiedState}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Phase 3 Rule-Based Panel */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📋</span>
+                    <div>
+                      <h3 className="font-display font-700 text-navy-900 text-sm">
+                        Rule-Based Risk Engine
+                      </h3>
+                      <p className="text-[11px] text-slate-400">Deterministic threshold & audit rules</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[11px] font-600 px-2 py-0.5 rounded bg-navy-50 text-navy-700 border border-navy-100">
+                    v{analysisResult?.rule_engine_version || "1.1"}
+                  </span>
+                </div>
+                
+                {analysisResult ? (
+                  <div className="space-y-4">
+                    {/* Score & Gauge Bar */}
+                    <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Risk Score</div>
+                          <div className="flex items-baseline gap-1 mt-0.5">
+                            <span className={`text-3xl font-display font-900 ${
+                              analysisResult.risk_score >= 70 ? "text-red-700" :
+                              analysisResult.risk_score >= 40 ? "text-amber-700" :
+                              "text-emerald-700"
+                            }`}>
+                              {analysisResult.risk_score}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-400">/ 100</span>
+                          </div>
+                        </div>
+                        <span className={
+                          analysisResult.risk_level === 'Critical' ? 'badge-high' :
+                          analysisResult.risk_level === 'High' ? 'badge-high' :
+                          analysisResult.risk_level === 'Medium' ? 'badge-medium' :
+                          'badge-low'
+                        }>
+                          {analysisResult.risk_level} Risk
+                        </span>
+                      </div>
+
+                      {/* Score meter track */}
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden mt-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-700 ${
+                            analysisResult.risk_score >= 70 ? "bg-red-600" :
+                            analysisResult.risk_score >= 40 ? "bg-amber-500" :
+                            "bg-emerald-600"
+                          }`}
+                          style={{ width: `${Math.min(100, analysisResult.risk_score)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-1.5 font-mono">
+                        <span>0 (Nominal)</span>
+                        <span>40 (Threshold)</span>
+                        <span>100 (Critical)</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mt-4">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700 uppercase tracking-wide">
+                        <span className="flex items-center gap-1.5">
+                          <span>⚡</span>
+                          <span>Triggered Rules ({analysisResult.rules_triggered?.length || 0})</span>
+                        </span>
+                        {analysisResult.rules_triggered?.length > 0 && (
+                          <span className="text-[11px] font-semibold text-red-600 font-mono">
+                            +{analysisResult.rules_triggered.reduce((acc: number, r: any) => acc + getRulePoints(r), 0)} pts total
+                          </span>
+                        )}
+                      </div>
+
+                      {analysisResult.rules_triggered?.length === 0 ? (
+                        <div className="flex items-center gap-3 p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-500">
+                          <span className="text-lg">✅</span>
+                          <div>
+                            <div className="font-bold">No Violations Detected</div>
+                            <div className="text-emerald-700/80 text-[11px]">All deterministic fiscal and progress criteria remain within sanctioned parameters.</div>
+                          </div>
+                        </div>
+                      ) : (
+                        analysisResult.rules_triggered?.map((r: any, i: number) => {
+                          const pts = getRulePoints(r);
+                          return (
+                            <div key={i} className="bg-slate-50/70 hover:bg-slate-50 p-3.5 rounded-xl border text-sm border-slate-200/80 transition-colors">
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-navy-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                                    {r.rule_id}
+                                  </span>
+                                  <span className="text-xs font-bold text-slate-800">{r.title}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${getSeverityBadgeClass(r.severity)}`}>
+                                    {r.severity || "HIGH"}
+                                  </span>
+                                  <span className="text-xs font-bold font-mono text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">
+                                    +{pts} pts
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-xs text-slate-600 mb-2 leading-relaxed">{r.description}</div>
+                              <div className="bg-white/80 rounded-lg p-2.5 border border-slate-100 text-[11px] space-y-1 font-mono">
+                                <div className="flex items-center gap-1.5 text-slate-500">
+                                  <span className="font-semibold text-slate-700">Threshold:</span>
+                                  <span className="text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60">{r.threshold}</span>
+                                </div>
+                                <div className="flex items-start gap-1.5 text-slate-500">
+                                  <span className="font-semibold text-slate-700 flex-shrink-0">Observed:</span>
+                                  <span className="text-navy-900 font-500">{formatObservedValues(r)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500 py-10 text-center">No Rule-Based Assessment available.</div>
+                )}
+              </div>
+            </div>
+
+            {/* Phase 4 ML Anomaly Panel */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🤖</span>
+                    <div>
+                      <h3 className="font-display font-700 text-navy-900 text-sm">
+                        ML Isolation Forest
+                      </h3>
+                      <p className="text-[11px] text-slate-400">Unsupervised outlier detection model</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[11px] font-600 px-2 py-0.5 rounded bg-navy-50 text-navy-700 border border-navy-100">
+                    {mlAssessment?.model_version || "viforest_v1"}
+                  </span>
+                </div>
+                
+                {mlAssessment ? (
+                  <div className="space-y-4">
+                    <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Anomaly Score</div>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className={`text-3xl font-display font-900 ${
+                              mlAssessment.anomaly_flag ? "text-purple-700" : "text-navy-900"
+                            }`}>
+                              {mlAssessment.ml_anomaly_score != null ? Number(mlAssessment.ml_anomaly_score).toFixed(2) : "N/A"}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-normal">(Lower = more anomalous)</span>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase border flex items-center gap-1.5 ${
+                          mlAssessment.anomaly_status === 'INSUFFICIENT_DATA'
+                            ? 'bg-slate-100 text-slate-700 border-slate-300'
+                            : mlAssessment.anomaly_flag
+                            ? 'bg-purple-100 text-purple-900 border-purple-300 shadow-2xs'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            mlAssessment.anomaly_status === 'INSUFFICIENT_DATA' ? 'bg-slate-400' :
+                            mlAssessment.anomaly_flag ? 'bg-purple-600 animate-pulse' : 'bg-emerald-600'
+                          }`} />
+                          {mlAssessment.anomaly_status === 'INSUFFICIENT_DATA' ? "Insufficient Data" :
+                           mlAssessment.anomaly_flag ? "Anomalous" : "Normal"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 bg-navy-50/70 border-l-3 border-navy-600 rounded-r-lg p-3 text-xs text-navy-900 leading-relaxed">
+                        <strong className="text-navy-950 flex items-center gap-1 mb-1">
+                          <span>💡</span> Contextual Explanation:
+                        </strong>
+                        <p className="text-slate-700">{mlAssessment.explanation || "The project's financial and physical progress patterns are consistent with the normal distribution of the reference dataset."}</p>
+                        <div className="text-[10px] text-slate-400 mt-2 italic">Note: Isolation Forest flags multidimensional outliers but does not establish causality or proof of misconduct.</div>
+                      </div>
+                    </div>
+
+                    {mlAssessment.data_quality_warnings?.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+                        <strong className="flex items-center gap-1 mb-1">
+                          <span>⚠️</span> Pipeline Warnings:
+                        </strong>
+                        <ul className="list-disc list-inside space-y-0.5 text-amber-800 text-[11px]">
+                          {mlAssessment.data_quality_warnings.map((w: string, i: number) => <li key={i}>{w}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <span>📐</span> Features used:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(mlAssessment.features_used || ["original_cost_cr", "revised_cost_cr", "expenditure_cr", "reported_progress_pct"]).map((feat: string, i: number) => (
+                          <span key={i} className="font-mono text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                            {feat}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500 py-10 text-center">
+                    {!canViewMl ? (
+                      <div className="space-y-3 bg-slate-50/60 rounded-xl border border-slate-200/80 p-6">
+                        <div className="w-12 h-12 mx-auto rounded-full bg-navy-50 border border-navy-100 flex items-center justify-center text-xl">
+                          🔒
+                        </div>
+                        <div className="font-display font-700 text-navy-900 text-sm">ML Anomaly Assessment Restricted</div>
+                        <div className="text-xs text-slate-500 max-w-[300px] mx-auto leading-relaxed">
+                          Isolation Forest vectors are restricted to Administrative and Departmental Oversight roles per Project Drishti RBAC policy.
+                        </div>
+                        <div className="text-[11px] font-mono text-navy-700 bg-white px-2.5 py-1 rounded inline-block border border-slate-200 shadow-2xs">
+                          Role: {user?.role || "GUEST"} • Required: ADMIN / OVERSIGHT
+                        </div>
+                      </div>
+                    ) : (
+                      "No ML Assessment available."
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Synthesized Investigation Summary */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            unifiedState === "Both Flagged (Rule + ML)" ? "bg-red-50/70 border-red-200 text-red-950" :
+            unifiedState === "Rule Risk Flagged Only" ? "bg-orange-50/70 border-orange-200 text-amber-950" :
+            unifiedState === "ML Anomaly Flagged Only" ? "bg-purple-50/70 border-purple-200 text-purple-950" :
+            "bg-slate-50/80 border-slate-200 text-slate-800"
+          }`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-base">
+                {unifiedState === "Both Flagged (Rule + ML)" ? "🚨" :
+                 unifiedState === "Rule Risk Flagged Only" ? "⚠️" :
+                 unifiedState === "ML Anomaly Flagged Only" ? "🔬" : "⚖️"}
+              </span>
+              <h4 className="font-display font-700 text-sm text-navy-900">
+                Synthesized Investigation Summary
+              </h4>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              {unifiedState === "Both Flagged (Rule + ML)" ? 
+                "This project triggered hard deterministic rules and exhibits highly anomalous structural patterns relative to the official reference dataset. Human review is strongly recommended to verify physical progress and expenditure." : 
+               unifiedState === "Rule Risk Flagged Only" ? 
+                "This project violated deterministic policy thresholds but its multi-dimensional progression is relatively common in the dataset. Verify the specific rule violations." : 
+               unifiedState === "ML Anomaly Flagged Only" ? 
+                "This project passed deterministic policy thresholds but exhibits unusual multidimensional progression (e.g. expenditure/progress gaps). Review as a potential emerging outlier." : 
+               unifiedState === "Neither Flagged" ? 
+                "This project shows normal progression patterns and passes all policy thresholds. No immediate action required." : 
+                "Assessment data is incomplete. Ensure financial and physical progress values are properly reported."
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+      )}
+
       {/* Human Verification Workflow & Audit Trail */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-500 delay-200 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+      {(canVerify || canViewVerifications) && (
+      <div className={`grid grid-cols-1 ${canVerify ? "md:grid-cols-2" : "grid-cols-1"} gap-6 transition-all duration-500 delay-200 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
         
+        {canVerify && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="font-display font-700 text-navy-900 text-lg mb-4">Record Verification</h3>
           <div className="space-y-4">
@@ -325,7 +841,7 @@ export default function ProjectDetails() {
             <div>
               <label className="block text-xs font-600 text-slate-600 mb-1">Review Notes</label>
               <textarea 
-                value={verifyNotes}
+                value={verifyNotes} 
                 onChange={(e) => setVerifyNotes(e.target.value)}
                 rows={3} 
                 className="w-full text-sm border-slate-200 rounded-md focus:border-navy-500 focus:ring-navy-500"
@@ -336,14 +852,14 @@ export default function ProjectDetails() {
               <label className="block text-xs font-600 text-slate-600 mb-1">Evidence Reference URL (Optional)</label>
               <input 
                 type="text" 
-                value={verifyEvidence}
+                value={verifyEvidence} 
                 onChange={(e) => setVerifyEvidence(e.target.value)}
                 className="w-full text-sm border-slate-200 rounded-md focus:border-navy-500 focus:ring-navy-500"
                 placeholder="e.g. https://system/docs/report123.pdf"
               />
             </div>
             <button 
-              onClick={handleVerify}
+              onClick={handleVerify} 
               disabled={verifyLoading}
               className={`w-full bg-navy-800 text-white font-600 py-2 rounded-md hover:bg-navy-700 transition ${verifyLoading ? 'opacity-50' : ''}`}
             >
@@ -351,6 +867,7 @@ export default function ProjectDetails() {
             </button>
           </div>
         </div>
+        )}
 
         <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-full max-h-[420px]">
           <h3 className="font-display font-700 text-navy-900 text-lg mb-4">Verification Audit Trail</h3>
@@ -377,6 +894,259 @@ export default function ProjectDetails() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Phase 7: Corrective Actions & Governance Follow-up */}
+      {canViewActions && (
+      <div className={`bg-white rounded-xl border border-slate-200 p-6 transition-all duration-500 delay-300 ${animated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🎯</span>
+              <h3 className="font-display font-700 text-navy-900 text-lg">Corrective Actions & Follow-up</h3>
+              <span className="text-xs bg-navy-100 text-navy-800 font-bold px-2 py-0.5 rounded-full">
+                {correctiveActions.length} Actions
+              </span>
+              {correctiveActions.some(a => a.is_overdue) && (
+                <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full animate-pulse">
+                  ⚠️ Overdue Items
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              End-to-end corrective action workflow connected to Project Findings, ML anomalies, and Verification records.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {canCreateActions && (
+            <button
+              onClick={() => {
+                const reasons: string[] = [];
+                if (analysisResult?.rules_triggered?.length) {
+                  reasons.push(`Rule violations: ${analysisResult.rules_triggered.map((r: any) => r.rule_id).join(", ")}`);
+                }
+                if (mlAssessment?.anomaly_flag) {
+                  reasons.push(`ML Anomaly detected (Score: ${mlAssessment.ml_anomaly_score})`);
+                }
+                setActionReason(reasons.join("; ") || "Field observation or verification finding");
+                setActionTitle(`Rectify Findings for ${project.project_id}`);
+                setShowActionModal(true);
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-sm flex items-center gap-1.5 transition"
+            >
+              <span>+</span>
+              <span>Initiate Corrective Action</span>
+            </button>
+            )}
+
+            <button
+              onClick={() => navigate(`/actions?project_id=${id}`)}
+              className="bg-navy-50 hover:bg-navy-100 text-navy-800 font-600 text-xs px-3 py-2 rounded-lg border border-navy-200 transition"
+            >
+              All Actions Console →
+            </button>
+          </div>
+        </div>
+
+        {correctiveActions.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-sm">
+            <div className="text-2xl mb-2">📋</div>
+            No corrective actions have been initiated for this project yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                  <th className="py-2.5 px-3 font-bold">Action ID</th>
+                  <th className="py-2.5 px-3 font-bold">Title & Description</th>
+                  <th className="py-2.5 px-3 font-bold">Priority</th>
+                  <th className="py-2.5 px-3 font-bold">Status</th>
+                  <th className="py-2.5 px-3 font-bold">Assignee</th>
+                  <th className="py-2.5 px-3 font-bold">Due Date & Escalation</th>
+                  <th className="py-2.5 px-3 font-bold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {correctiveActions.map(action => (
+                  <tr key={action.action_id} className="hover:bg-slate-50/70 transition">
+                    <td className="py-3 px-3 font-mono font-bold text-navy-900">{action.action_id}</td>
+                    <td className="py-3 px-3 max-w-[280px]">
+                      <div className="font-bold text-slate-800">{action.title}</div>
+                      <div className="text-slate-500 text-[11px] truncate mt-0.5">{action.reason}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        action.priority === 'CRITICAL' ? 'bg-red-100 text-red-800 border border-red-200' :
+                        action.priority === 'HIGH' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                        action.priority === 'MEDIUM' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
+                        'bg-blue-100 text-blue-800 border border-blue-200'
+                      }`}>
+                        {action.priority}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        action.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
+                        action.status === 'AWAITING_REVIEW' ? 'bg-amber-100 text-amber-800' :
+                        action.status === 'IN_PROGRESS' ? 'bg-sky-100 text-sky-800' :
+                        action.status === 'CANCELLED' ? 'bg-slate-100 text-slate-600' :
+                        action.status === 'REOPENED' ? 'bg-red-100 text-red-800' :
+                        'bg-indigo-100 text-indigo-800'
+                      }`}>
+                        {action.status.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-600 text-slate-700">{action.assigned_to || "Unassigned"}</div>
+                      <div className="text-slate-400 text-[10px]">{action.assigned_agency || "N/A"}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div>{action.due_date ? new Date(action.due_date).toLocaleDateString() : '—'}</div>
+                      {action.is_overdue ? (
+                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                          ⚠️ Overdue ({action.days_overdue}d)
+                        </span>
+                      ) : action.days_remaining !== null && action.days_remaining !== undefined ? (
+                        <span className="text-[10px] text-green-700 mt-0.5 inline-block">
+                          ⏱️ {action.days_remaining}d left
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        onClick={() => navigate(`/actions?project_id=${id}`)}
+                        className="text-navy-700 hover:text-navy-900 font-bold text-xs underline"
+                      >
+                        Manage →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Action Creation Modal */}
+      {showActionModal && canCreateActions && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowActionModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-navy-900 text-white px-5 py-4 flex items-center justify-between">
+              <h3 className="font-bold text-sm">Initiate Corrective Action for {project.project_id}</h3>
+              <button onClick={() => setShowActionModal(false)} className="text-white text-lg leading-none">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateAction} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Action Title *</label>
+                <input
+                  required
+                  type="text"
+                  value={actionTitle}
+                  onChange={e => setActionTitle(e.target.value)}
+                  placeholder="e.g. Rectify compaction and submit updated lab reports"
+                  className="w-full border border-slate-200 rounded p-2 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Detailed Description *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={actionDesc}
+                  onChange={e => setActionDesc(e.target.value)}
+                  placeholder="Detailed instructions for the assigned engineer or agency..."
+                  className="w-full border border-slate-200 rounded p-2 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Reason for Action *</label>
+                <input
+                  required
+                  type="text"
+                  value={actionReason}
+                  onChange={e => setActionReason(e.target.value)}
+                  className="w-full border border-slate-200 rounded p-2 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Priority *</label>
+                  <select
+                    value={actionPriority}
+                    onChange={e => setActionPriority(e.target.value as any)}
+                    className="w-full border border-slate-200 rounded p-2 text-xs"
+                  >
+                    <option value="CRITICAL">CRITICAL</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="LOW">LOW</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Due Date *</label>
+                  <input
+                    required
+                    type="date"
+                    value={actionDueDate}
+                    onChange={e => setActionDueDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded p-2 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Assign To User</label>
+                  <input
+                    type="text"
+                    placeholder="Officer username"
+                    value={actionAssignee}
+                    onChange={e => setActionAssignee(e.target.value)}
+                    className="w-full border border-slate-200 rounded p-2 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Implementing Agency</label>
+                  <input
+                    type="text"
+                    placeholder="Agency name"
+                    value={actionAgency}
+                    onChange={e => setActionAgency(e.target.value)}
+                    className="w-full border border-slate-200 rounded p-2 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowActionModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded"
+                >
+                  {actionLoading ? "Submitting..." : "Initiate Action"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   )

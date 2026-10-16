@@ -5,6 +5,8 @@ import { RiskBadge } from "../components/RiskBadge"
 
 import { projectService } from "../services/projectService"
 import { Project } from "../types"
+import { useAuth } from "../contexts/AuthContext"
+import { canAccessPath, hasCapability } from "../permissions/rbac"
 
 // We will fetch these dynamically
 // const riskData = ...
@@ -14,20 +16,24 @@ import { Project } from "../types"
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user, dataEpoch } = useAuth()
   const [animated, setAnimated] = useState(false)
-  const [activeTab, setActiveTab] = useState<"ministry" | "sector">("ministry")
 
   const [allProjects, setAllProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedState, setSelectedState] = useState("All States")
   const [analyzing, setAnalyzing] = useState(false)
-  const [analyzeSummary, setAnalyzeSummary] = useState<any>(null)
+  const [analyzeSummary, 
+    setAnalyzeSummary] = useState<any>(null)
+  const canBulkAnalyze = hasCapability(user?.role, "bulk_analyze")
+  const canViewRisk = hasCapability(user?.role, "view_internal_risk")
+  const canViewMl = hasCapability(user?.role, "view_ml_assessment")
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100)
     fetchProjects()
     return () => clearTimeout(t)
-  }, [])
+  }, [dataEpoch])
   
   const fetchProjects = async () => {
     setLoading(true)
@@ -63,8 +69,7 @@ export default function Dashboard() {
   const totalCost = projects.reduce((sum, p) => sum + (Number(p.original_cost) || 0), 0)
   const totalRevised = projects.reduce((sum, p) => sum + (Number(p.revised_cost) || 0), 0)
   const totalExp = projects.reduce((sum, p) => sum + (Number(p.expenditure) || 0), 0)
-  const officialCount = projects.filter(p => p.data_source_type === 'OFFICIAL').length
-  const syntheticCount = projects.filter(p => p.data_source_type === 'SYNTHETIC_DEMO').length
+  const officialCount = projects.length
 
   const dummyHighRiskCount = projects.filter(p => p.risk_level === 'High' || p.risk_level === 'Critical').length
   const dummyMediumRiskCount = projects.filter(p => p.risk_level === 'Medium').length
@@ -106,7 +111,7 @@ export default function Dashboard() {
                 <select value={selectedState} onChange={(e) => setSelectedState(e.target.value)} style={{ background: "white", border: "1.5px solid var(--color-border)", borderRadius: 8, padding: "3px 8px", fontSize: "0.76rem", color: "var(--color-navy-700)", fontWeight: 600, outline: "none", cursor: "pointer", boxShadow: "0 1px 4px rgba(26,48,104,0.06)" }}>
                   {states.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <span>· Welcome back, Rajath 👋</span>
+                <span>· Welcome back, {user?.username || "officer"}</span>
               </p>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -115,6 +120,7 @@ export default function Dashboard() {
                   ✓ {analyzeSummary.successful} assessed
                 </span>
               )}
+              {canBulkAnalyze && (
               <button
                 onClick={handleBulkAnalyze}
                 disabled={analyzing}
@@ -125,8 +131,7 @@ export default function Dashboard() {
                   <><svg style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" /><path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" /></svg> Analyzing...</>
                 ) : '🔍 Analyze All'}
               </button>
-              <button onClick={() => setActiveTab("ministry")} className={`btn-gov-${activeTab === "ministry" ? "primary" : "outline"}`} style={{ fontSize: "0.8rem" }}>Ministry</button>
-              <button onClick={() => setActiveTab("sector")} className={`btn-gov-${activeTab === "sector" ? "primary" : "outline"}`} style={{ fontSize: "0.8rem" }}>Sector</button>
+              )}
             </div>
           </div>
 
@@ -148,7 +153,7 @@ export default function Dashboard() {
                       { icon: "📊", label: "Revised Cost (Cr.)", value: formatCr(totalRevised), accent: false },
                       { icon: "📈", label: "Expenditure (Cr.)", value: formatCr(totalExp), accent: false },
                       { icon: "✅", label: "Official Projects", value: officialCount.toLocaleString(), accent: false },
-                      { icon: "🧪", label: "Synthetic Demo", value: syntheticCount.toLocaleString(), accent: true },
+                      { icon: "🏛️", label: "Access Scope", value: canViewRisk ? "Full Oversight" : "Public Oversight", accent: false },
                     ].map((s, i) => (
                       <div
                         key={s.label}
@@ -172,7 +177,7 @@ export default function Dashboard() {
             {/* Table */}
             <div className="gov-card" style={{ overflow: "hidden" }}>
               <div className="gov-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>High Priority Projects — Sorted by Risk Score</span>
+                <span>{canViewRisk ? "High Priority Projects — Sorted by Risk Score" : "Public Infrastructure Projects"}</span>
                 <button onClick={() => navigate("/map")} style={{ background: "var(--color-orange-400)", border: "none", color: "white", padding: "3px 10px", borderRadius: 12, fontSize: "0.7rem", fontWeight: 600, cursor: "pointer" }}>
                   View All →
                 </button>
@@ -185,8 +190,8 @@ export default function Dashboard() {
                       <th>Location</th>
                       <th>Budget</th>
                       <th>Progress (%)</th>
-                      <th>Rule Risk Score</th>
-                      <th>ML Anomaly</th>
+                      {canViewRisk && <th>Rule Risk Score</th>}
+                      {canViewMl && <th>ML Anomaly</th>}
                       <th>Verification</th>
                     </tr>
                   </thead>
@@ -201,8 +206,8 @@ export default function Dashboard() {
                         <td style={{ paddingLeft: 20 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                             <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.75rem" }}>{p.project_id}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${p.data_source_type === 'SYNTHETIC_DEMO' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                              {p.data_source_type === 'SYNTHETIC_DEMO' ? 'Synthetic Demo' : 'Official'}
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-100 text-green-700">
+                              Official
                             </span>
                           </div>
                           <div style={{ color: "var(--color-text-secondary)", fontSize: "0.78rem", maxWidth: 160 }} className="truncate" title={p.project_name}>{p.project_name}</div>
@@ -219,6 +224,7 @@ export default function Dashboard() {
                             <span style={{ fontSize: "0.75rem", color: "var(--color-navy-600)", fontWeight: 600 }}>{progressStr}%</span>
                           </div>
                         </td>
+                        {canViewRisk && (
                         <td>
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                             <span style={{
@@ -228,6 +234,8 @@ export default function Dashboard() {
                             <RiskBadge status={status} />
                           </div>
                         </td>
+                        )}
+                        {canViewMl && (
                         <td>
                           {p.anomaly_status === "ASSESSED" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -243,6 +251,7 @@ export default function Dashboard() {
                             <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>{p.anomaly_status?.replace("_", " ")}</span>
                           )}
                         </td>
+                        )}
                         <td>
                           <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${p.verification_status === 'VERIFIED' ? 'bg-green-100 text-green-700' : p.verification_status === 'CLOSED' ? 'bg-slate-200 text-slate-700' : p.verification_status === 'IN_REVIEW' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                             {p.verification_status || 'NOT_REVIEWED'}
@@ -258,82 +267,100 @@ export default function Dashboard() {
 
             {/* Right: Risk donut + alerts */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Donut */}
-              <div className="gov-card" style={{ overflow: "hidden" }}>
-                <div className="gov-card-header">Risk Distribution</div>
-                <div style={{ padding: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 130, height: 130, flexShrink: 0, position: "relative" }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={riskData} cx="50%" cy="50%" innerRadius={38} outerRadius={58} paddingAngle={3} dataKey="value">
-                            {riskData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                          </Pie>
-                          <Tooltip formatter={v => [`${v} projects`, ""]} contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
-                        <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.9rem", color: "var(--color-navy-700)" }}>{projects.length}</div>
-                        <div style={{ fontSize: "0.5rem", color: "var(--color-text-muted)" }}>Projects</div>
-                      </div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      {riskData.map(r => (
-                        <div key={r.name} style={{ marginBottom: 8 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                              <span style={{ width: 9, height: 9, borderRadius: 2, background: r.color, display: "block" }} />
-                              <span style={{ fontSize: "0.72rem", color: "var(--color-text-secondary)" }}>{r.name}</span>
-                            </div>
-                            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.75rem", color: "var(--color-navy-700)" }}>{r.value}</span>
-                          </div>
-                          <div className="progress-track" style={{ height: 5 }}>
-                            <div style={{ height: "100%", background: r.color, borderRadius: 99, width: animated && projects.length > 0 ? `${(r.value / projects.length) * 100}%` : "0%", transition: "width 1s ease-out" }} />
-                          </div>
+              {canViewRisk && (
+              <>
+                {/* Donut */}
+                <div className="gov-card" style={{ overflow: "hidden" }}>
+                  <div className="gov-card-header">Risk Distribution</div>
+                  <div style={{ padding: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 130, height: 130, flexShrink: 0, position: "relative" }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={riskData} cx="50%" cy="50%" innerRadius={38} outerRadius={58} paddingAngle={3} dataKey="value">
+                              {riskData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                            </Pie>
+                            <Tooltip formatter={v => [`${v} projects`, ""]} contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.9rem", color: "var(--color-navy-700)" }}>{projects.length}</div>
+                          <div style={{ fontSize: "0.5rem", color: "var(--color-text-muted)" }}>Projects</div>
                         </div>
-                      ))}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        {riskData.map(r => (
+                          <div key={r.name} style={{ marginBottom: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <span style={{ width: 9, height: 9, borderRadius: 2, background: r.color, display: "block" }} />
+                                <span style={{ fontSize: "0.72rem", color: "var(--color-text-secondary)" }}>{r.name}</span>
+                              </div>
+                              <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.75rem", color: "var(--color-navy-700)" }}>{r.value}</span>
+                            </div>
+                            <div className="progress-track" style={{ height: 5 }}>
+                              <div style={{ height: "100%", background: r.color, borderRadius: 99, width: animated && projects.length > 0 ? `${(r.value / projects.length) * 100}%` : "0%", transition: "width 1s ease-out" }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Requires attention */}
-              <div className="gov-card" style={{ overflow: "hidden" }}>
-                <div className="gov-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span>⚠️ Immediate Attention</span>
-                  <span style={{ background: "var(--color-orange-400)", color: "white", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 800, boxShadow: "0 2px 8px rgba(247,164,29,0.4)" }}>3</span>
-                </div>
-                <div style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 3).map((p, i) => {
-                    const risk = p.risk_score || 0;
-                    const isHigh = risk >= 80;
-                    return (
-                    <div
-                      key={p.project_id}
-                      className={`risk-attention-card animate-fade-in-up delay-${(i + 1) * 100}`}
-                      style={{
-                        background: isHigh ? "linear-gradient(135deg, #fff5f5, #ffe8e8)" : "linear-gradient(135deg, #fffaf0, #fef3e0)",
-                        border: `1px solid ${isHigh ? "var(--color-risk-high-border)" : "var(--color-risk-medium-border)"}`,
-                        borderLeft: `4px solid ${isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)"}`,
-                      }}
-                      onClick={() => navigate(`/projects/${p.project_id}`)}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.68rem", background: "var(--color-navy-50)", padding: "1px 6px", borderRadius: 4, border: "1px solid var(--color-navy-100)" }}>{p.project_id}</span>
-                          <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)", marginTop: 4, lineHeight: 1.3 }} className="truncate" title={p.project_name}>{p.project_name}</div>
+                {/* Requires attention */}
+                <div className="gov-card" style={{ overflow: "hidden" }}>
+                  <div className="gov-card-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>⚠️ Immediate Attention</span>
+                    <span style={{ background: "var(--color-orange-400)", color: "white", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", fontWeight: 800, boxShadow: "0 2px 8px rgba(247,164,29,0.4)" }}>3</span>
+                  </div>
+                  <div style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 3).map((p, i) => {
+                      const risk = p.risk_score || 0;
+                      const isHigh = risk >= 80;
+                      return (
+                      <div
+                        key={p.project_id}
+                        className={`risk-attention-card animate-fade-in-up delay-${(i + 1) * 100}`}
+                        style={{
+                          background: isHigh ? "linear-gradient(135deg, #fff5f5, #ffe8e8)" : "linear-gradient(135deg, #fffaf0, #fef3e0)",
+                          border: `1px solid ${isHigh ? "var(--color-risk-high-border)" : "var(--color-risk-medium-border)"}`,
+                          borderLeft: `4px solid ${isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)"}`,
+                        }}
+                        onClick={() => navigate(`/projects/${p.project_id}`)}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.68rem", background: "var(--color-navy-50)", padding: "1px 6px", borderRadius: 4, border: "1px solid var(--color-navy-100)" }}>{p.project_id}</span>
+                            <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)", marginTop: 4, lineHeight: 1.3 }} className="truncate" title={p.project_name}>{p.project_name}</div>
+                          </div>
+                          <div style={{ flexShrink: 0, textAlign: "center" }}>
+                            <div style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1.2rem", color: isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)", lineHeight: 1 }}>{risk}</div>
+                            <div style={{ fontSize: "0.55rem", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Score</div>
+                          </div>
                         </div>
-                        <div style={{ flexShrink: 0, textAlign: "center" }}>
-                          <div style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "1.2rem", color: isHigh ? "var(--color-risk-high)" : "var(--color-risk-medium)", lineHeight: 1 }}>{risk}</div>
-                          <div style={{ fontSize: "0.55rem", color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Score</div>
-                        </div>
+                        <div style={{ fontSize: "0.68rem", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 4 }}>📍 {p.state}</div>
                       </div>
-                      <div style={{ fontSize: "0.68rem", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 4 }}>📍 {p.state}</div>
-                    </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              </>
+              )}
+
+              {!canViewRisk && (
+                <div className="gov-card" style={{ overflow: "hidden" }}>
+                  <div className="gov-card-header">📢 Public Oversight Information</div>
+                  <div style={{ padding: "16px", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                    <p style={{ marginBottom: 12 }}>
+                      Welcome to the Project Drishti Public Portal. Citizens can track physical progress, allocated budgets, and official milestones for major infrastructure projects across India.
+                    </p>
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "10px 12px", borderRadius: 8, color: "#166534", fontSize: "0.76rem", fontWeight: 600 }}>
+                      ✓ Displaying <strong>{projects.length}</strong> official verified public projects
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Quick links */}
               <div className="gov-card" style={{ overflow: "hidden" }}>
@@ -344,7 +371,7 @@ export default function Dashboard() {
                     { label: "Pending Inspections", path: "/inspections", icon: "📋" },
                     { label: "Recent Evidence", path: "/evidence", icon: "📸" },
                     { label: "Citizen Reports", path: "/report", icon: "🚩" },
-                  ].map((a, i) => (
+                  ].filter((a) => canAccessPath(user?.role, a.path)).map((a, i) => (
                     <button
                       key={a.label}
                       onClick={() => navigate(a.path)}

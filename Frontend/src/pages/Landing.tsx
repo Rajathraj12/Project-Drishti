@@ -1,277 +1,2091 @@
+/**
+ * Landing.tsx — Project Drishti public landing page
+ *
+ * Design: Institutional infrastructure-intelligence portal.
+ * Pulls live project and dashboard-summary data from the existing backend.
+ * RBAC: nav actions conditioned on user role; unauthenticated visitors see
+ *       public info only. All restricted routes still enforced server-side.
+ */
+
 import { useNavigate } from "react-router-dom"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useAuth } from "../contexts/AuthContext"
+import { hasCapability } from "../permissions/rbac"
+import { projectService } from "../services/projectService"
+import { reportService, type OversightDashboardData } from "../services/reportService"
+import { Project } from "../types"
 
-export default function Landing() {
-  const navigate = useNavigate()
-  const [heroSlide, setHeroSlide] = useState(0)
-  const [mounted, setMounted] = useState(false)
+// ─── tiny SVG icon helpers ────────────────────────────────────────────────────
 
-  const heroSlides = [
-    { title: "Project Monitoring", subtitle: "Government Infrastructure Projects Across India" },
-    { title: "Evidence-Driven Oversight", subtitle: "Real-time field data, satellite imagery & inspection records" },
-    { title: "Risk Analysis & Alerts", subtitle: "Automated anomaly detection for project oversight" },
-  ]
-
-  useEffect(() => {
-    setMounted(true)
-    const t = setInterval(() => setHeroSlide(s => (s + 1) % heroSlides.length), 5000)
-    return () => clearInterval(t)
-  }, [])
-
+function EyeIcon({ size = 20, color = "currentColor" }: { size?: number; color?: string }) {
   return (
-    <div style={{ minHeight: "100%", background: "white", fontFamily: "var(--font-sans)" }}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
 
-      {/* ===== TOP HEADER ===== */}
-      <header style={{ background: "white", borderBottom: "3px solid var(--color-orange-400)", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px", height: 68, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => navigate("/")}>
-            <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 48, objectFit: "contain" }} />
-          </div>
+function ArrowRight({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  )
+}
 
-          {/* CTA Buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={() => navigate("/dashboard")} className="btn-gov-primary">
-              ADD PROJECT / UPDATE
-            </button>
-            <button onClick={() => navigate("/dashboard")} className="btn-gov-secondary">
-              REPORTS
-            </button>
-          </div>
-        </div>
-      </header>
+function ChevronDown({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
 
-      {/* ===== NAV BAR ===== */}
-      <nav style={{ background: "var(--color-navy-700)", position: "sticky", top: 68, zIndex: 99 }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px", height: 44, display: "flex", alignItems: "center" }}>
-          {[
-            { label: "Home", href: "#" },
-            { label: "Publications", href: "#" },
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "About", href: "#about" },
-          ].map((item, i) => (
-            <a
-              key={item.label}
-              href={item.href}
-              onClick={item.href.startsWith("/") ? (e) => { e.preventDefault(); navigate(item.href) } : undefined}
-              className={`nav-link ${i === 0 ? "active" : ""}`}
-              style={{ textDecoration: "none" }}
-            >
-              {item.label}
-              {item.label === "Publications" && <span style={{ marginLeft: 4, fontSize: "0.6rem" }}>▾</span>}
-              {item.label === "Dashboard" && <span style={{ marginLeft: 4, fontSize: "0.6rem" }}>▾</span>}
-            </a>
-          ))}
-        </div>
-      </nav>
+function MenuIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  )
+}
 
-      {/* ===== HERO SLIDER ===== */}
-      <section style={{ position: "relative", height: 500, overflow: "hidden" }}>
-        {/* Animated Background Gradient */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)",
-          backgroundSize: "400% 400%",
-          animation: "gradient 15s ease infinite"
-        }} />
-        
-        {/* Modern Grid Pattern Overlay */}
-        <div style={{
-          position: "absolute", inset: 0,
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-          opacity: 0.5
-        }} />
-        
-        {/* Glow Effects */}
-        <div style={{
-          position: "absolute", top: "20%", left: "20%", width: 300, height: 300,
-          background: "rgba(99, 102, 241, 0.2)", filter: "blur(100px)", borderRadius: "50%"
-        }} />
-        <div style={{
-          position: "absolute", bottom: "10%", right: "20%", width: 400, height: 400,
-          background: "rgba(139, 92, 246, 0.2)", filter: "blur(120px)", borderRadius: "50%"
-        }} />
+function CloseIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
 
-        {/* Slide content */}
-        <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "0 24px" }}>
-          <div style={{
-            background: "rgba(15, 23, 42, 0.4)", borderRadius: 24, padding: "48px 56px",
-            backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-            maxWidth: 760,
-            transform: "translateY(0)",
-            transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}>
-            <h1 style={{
-              fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "3rem",
-              background: "linear-gradient(to right, #f8fafc, #cbd5e1)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-              lineHeight: 1.1, marginBottom: 20, letterSpacing: "-0.02em"
-            }}>
-              {heroSlides[heroSlide].title}
-            </h1>
-            <p style={{
-              color: "#94a3b8", fontSize: "1.1rem", marginBottom: 36,
-              maxWidth: 580, margin: "0 auto", lineHeight: 1.6, fontWeight: 400
-            }}>
-              {heroSlides[heroSlide].subtitle}
-            </p>
-            <button onClick={() => navigate("/dashboard")} style={{
-              background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-              color: "white", border: "none", padding: "14px 32px", borderRadius: 12,
-              fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "1.05rem",
-              cursor: "pointer", boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.5)",
-              transition: "transform 0.2s, box-shadow 0.2s",
-              marginTop: 16
-            }}>
-              Access Dashboard →
-            </button>
-          </div>
-        </div>
+function DatabaseIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
+      <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
+    </svg>
+  )
+}
 
-        {/* Slide indicators */}
-        <div style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8 }}>
-          {heroSlides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setHeroSlide(i)}
-              style={{
-                width: i === heroSlide ? 24 : 10, height: 10, borderRadius: 5,
-                background: i === heroSlide ? "var(--color-orange-400)" : "rgba(255,255,255,0.4)",
-                border: "none", cursor: "pointer", transition: "all 0.3s",
-              }}
-            />
-          ))}
-        </div>
+function SearchIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  )
+}
 
-        {/* Arrows */}
-        <button onClick={() => setHeroSlide(s => (s - 1 + heroSlides.length) % heroSlides.length)} style={{
-          position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-          width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.2)",
-          border: "1px solid rgba(255,255,255,0.3)", color: "white", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem",
-        }}>‹</button>
-        <button onClick={() => setHeroSlide(s => (s + 1) % heroSlides.length)} style={{
-          position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-          width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.2)",
-          border: "1px solid rgba(255,255,255,0.3)", color: "white", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem",
-        }}>›</button>
-      </section>
+function ClipboardCheckIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <polyline points="9 12 11 14 15 10" />
+    </svg>
+  )
+}
+
+function AlertTriangleIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+// ─── colour tokens (matching the design system) ───────────────────────────────
+
+const C = {
+  navy900: "#0b1f4b",
+  navy800: "#0f2a6b",
+  navy700: "#142B59",   // institutional navy as spec'd
+  navy600: "#1f3b82",
+  navy500: "#2b4fa0",
+  navy100: "#d4e2f5",
+  navy50:  "#eef4fb",
+  amber:   "#f7a41d",   // saffron accent
+  amber600:"#d97706",
+  ivory:   "#f9f7f3",   // warm off-white
+  ivory2:  "#f2efe9",
+  slate:   "#64748b",
+  slateLight: "#94a3b8",
+  border:  "#dce8f5",
+  white:   "#ffffff",
+  risk_high_text: "#c53030",
+  risk_high_bg:   "#fff5f5",
+  risk_med_text:  "#b7791f",
+  risk_low_text:  "#276749",
+}
+
+// ─── hero carousel slides ─────────────────────────────────────────────────────
+
+const HERO_SLIDES = [
+  {
+    img: "/hero-infrastructure.jpg",
+    caption: "Aerial view · Expressway Interchange · India",
+    eyebrow: "Infrastructure Monitoring & Risk Intelligence",
+    headline: "Greater visibility into India's public infrastructure projects.",
+    body: "Project Drishti brings together project progress, financial indicators, risk signals, and verification records to support evidence-based, accountable monitoring of government infrastructure works.",
+  },
+  {
+    img: "/hero-railway.jpg",
+    caption: "Railway viaduct · River valley · India",
+    eyebrow: "Rail & Transport Infrastructure",
+    headline: "Connecting field evidence to verified project outcomes.",
+    body: "From satellite imagery and inspection records to financial utilisation data — every data point is linked to its source and reporting date so officers can assess reliability.",
+  },
+  {
+    img: "/hero-bridge.jpg",
+    caption: "Cable-stayed bridge · River crossing · India",
+    eyebrow: "Construction & Civil Works Oversight",
+    headline: "Risk intelligence that supports informed decisions.",
+    body: "Rule-based risk assessments surface patterns across hundreds of projects, enabling officers to prioritise field verification where it matters most.",
+  },
+]
+
+// ─── interactive workflow stages ──────────────────────────────────────────────
+
+const WORKFLOW_STEPS = [
+  {
+    n: "01",
+    phase: "Stage 01 · Ingestion",
+    shortTitle: "Data Ingestion",
+    Icon: DatabaseIcon,
+    title: "Project Data & Provenance",
+    subtitle: "Automated Multi-Source Official Ingestion",
+    body: "Project information — expenditure, timelines, contractor records, scheme linkages, and field reports — is collected from supported official sources. Data provenance is recorded so analysts can assess source reliability.",
+    accent: "#D97706",
+    accentLight: "rgba(217, 119, 6, 0.12)",
+    accentBorder: "rgba(217, 119, 6, 0.35)",
+    accentGrad: "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+    shadowColor: "rgba(217, 119, 6, 0.28)",
+    bgGrad: "linear-gradient(180deg, #FFFFFF 0%, #FFFDF5 100%)",
+    watermarkColor: "rgba(217, 119, 6, 0.07)",
+    pills: ["Official Portals", "Expenditure Feeds", "SHA-256 Provenance"],
+    metrics: [
+      { label: "Official Sources", val: "MoRTH · PMGSY · State PWD" },
+      { label: "Integrity Stamping", val: "SHA-256 Cryptographic Hash" },
+      { label: "Pipeline Status", val: "Real-time Ingestion Active" },
+    ],
+    deepDive: {
+      headline: "Cryptographic Provenance & Ingestion Specs",
+      detail: "Official tender awards, PFMS vouchers, and geo-tagged inspection records are ingested through strict automated validation schemas. Every record receives an immutable cryptographic hash stamp to guarantee complete data custody.",
+      actionText: "View Ingested Projects",
+      actionTarget: "#projects",
+    },
+    delay: 0,
+  },
+  {
+    n: "02",
+    phase: "Stage 02 · Intelligence",
+    shortTitle: "Risk & ML Analysis",
+    Icon: SearchIcon,
+    title: "Risk Analysis & Verification",
+    subtitle: "Dual-Engine Rule & Anomaly Scan",
+    body: "Rule-based assessments compare reported progress against financial indicators, timeline expectations, and known risk factors. Experimental ML anomaly signals are available for authorized officers as a supplementary indicator — not a definitive determination.",
+    accent: "#2563EB",
+    accentLight: "rgba(37, 99, 235, 0.12)",
+    accentBorder: "rgba(37, 99, 235, 0.35)",
+    accentGrad: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+    shadowColor: "rgba(37, 99, 235, 0.28)",
+    bgGrad: "linear-gradient(180deg, #FFFFFF 0%, #F5F9FF 100%)",
+    watermarkColor: "rgba(37, 99, 235, 0.07)",
+    pills: ["12+ Risk Rule Signals", "Budget-Physical Delta", "ML Isolation Forest"],
+    metrics: [
+      { label: "Deterministic Engine", val: "Schedule & Cost Velocity" },
+      { label: "ML Anomaly Model", val: "Isolation Forest Algorithm" },
+      { label: "Evaluation Status", val: "Dual Engine Active" },
+    ],
+    deepDive: {
+      headline: "Dual-Layer Risk & Anomaly Intelligence",
+      detail: "Correlates financial disbursement velocity against physical completion milestones. Disproportionate expenditure spikes and chronic milestone slippage trigger real-time risk scores and ML anomaly markers for priority officer attention.",
+      actionText: "Explore Risk Assessments",
+      actionTarget: "#projects",
+    },
+    delay: 0.1,
+  },
+  {
+    n: "03",
+    phase: "Stage 03 · Governance",
+    shortTitle: "Corrective Action",
+    Icon: ClipboardCheckIcon,
+    title: "Corrective Action & Oversight",
+    subtitle: "Closed-Loop Verification Lifecycle",
+    body: "Authorized officers review findings, record verification outcomes, and initiate corrective actions. Actions are tracked through their lifecycle — open, in progress, resolved — providing a complete audit trail.",
+    accent: "#0D9488",
+    accentLight: "rgba(13, 148, 136, 0.12)",
+    accentBorder: "rgba(13, 148, 136, 0.35)",
+    accentGrad: "linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)",
+    shadowColor: "rgba(13, 148, 136, 0.28)",
+    bgGrad: "linear-gradient(180deg, #FFFFFF 0%, #F4FBF9 100%)",
+    watermarkColor: "rgba(13, 148, 136, 0.07)",
+    pills: ["Officer Sign-Offs", "Lifecycle Tracking", "Immutable Audit Log"],
+    metrics: [
+      { label: "Action Lifecycle", val: "Open ➔ In Review ➔ Resolved" },
+      { label: "Verification Record", val: "Geotagged & Signed Logs" },
+      { label: "Accountability", val: "Audit Logging Enabled" },
+    ],
+    deepDive: {
+      headline: "Closed-Loop Oversight & Corrective Action",
+      detail: "Authorized departmental officers conduct ground verifications, record physical inspection findings, and initiate structured corrective actions. All status transitions are logged with an immutable audit trail for complete accountability.",
+      actionText: "Review Oversight Framework",
+      actionTarget: "#projects",
+    },
+    delay: 0.2,
+  },
+]
 
 
+// ─── progress bar ─────────────────────────────────────────────────────────────
 
-      {/* ===== HOW IT WORKS ===== */}
-      <section style={{ padding: "56px 24px", background: "white" }} id="about">
-        <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 40 }}>
-            <div className="section-label" style={{ marginBottom: 10 }}>Platform Overview</div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.75rem", color: "var(--color-navy-700)", marginBottom: 10 }}>
-              How Project Drishti Works
-            </h2>
-            <p style={{ color: "var(--color-text-muted)", maxWidth: 560, margin: "0 auto", lineHeight: 1.7 }}>
-              An integrated monitoring platform combining financial data, field evidence, and inspection records.
-            </p>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
-            {[
-              { step: "01", icon: "🔗", title: "Data Integration", desc: "Project expenditure, timelines, contractor records, inspection photos and field reports aggregated from multiple government systems." },
-              { step: "02", icon: "🔍", title: "Pattern Analysis", desc: "Algorithms compare reported progress against financial data, timeline expectations, and historical contractor performance to identify anomalies." },
-              { step: "03", icon: "📋", title: "Prioritized Action", desc: "Officers receive a curated list of projects flagged for attention, with evidence-based reasons and recommended verification steps." },
-            ].map((s, i) => (
-              <div key={s.step} className="gov-card" style={{ padding: "24px 22px", position: "relative", overflow: "hidden" }}>
-                <div style={{
-                  position: "absolute", top: 0, left: 0, right: 0, height: 3,
-                  background: i === 0 ? "var(--color-orange-400)" : i === 1 ? "var(--color-navy-500)" : "var(--color-risk-low)",
-                }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.2rem", color: "var(--color-navy-100)", lineHeight: 1 }}>{s.step}</span>
-                  <span style={{ fontSize: "1.5rem" }}>{s.icon}</span>
-                </div>
-                <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "1rem", marginBottom: 10 }}>{s.title}</h3>
-                <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem", lineHeight: 1.7 }}>{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== HIGH VALUE PROJECTS (like reference) ===== */}
-      <section className="wave-bg" style={{ padding: "56px 24px" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.75rem", color: "var(--color-navy-700)", textAlign: "center", marginBottom: 36 }}>
-            High Risk Projects
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
-            {[
-              { sector: "Infrastructure", org: "PWD Karnataka", project: "Expressway Phase-I", cost: "₹ 1,895 Cr", progress: 47, revised: "₹ 2,034 Cr", date: "31/12/2026", icon: "🏛️" },
-              { sector: "Roads", org: "BBMP Bengaluru", project: "Ward Road Widening", cost: "₹ 5.1 Cr", progress: 61, revised: "₹ 5.1 Cr", date: "30/06/2026", icon: "🛣️" },
-              { sector: "Education", org: "School Dept. KA", project: "Primary School Building", cost: "₹ 1.8 Cr", progress: 55, revised: "₹ 1.95 Cr", date: "31/03/2027", icon: "🏫" },
-              { sector: "Transport", org: "NHAI Hassan", project: "Bridge Construction (NH-48)", cost: "₹ 12.4 Cr", progress: 38, revised: "₹ 13.2 Cr", date: "31/12/2028", icon: "🌉" },
-            ].map(p => (
-              <div key={p.project} className="gov-card" style={{ padding: "20px 18px", textAlign: "center" }}>
-                <div style={{ fontSize: "2.5rem", marginBottom: 10 }}>{p.icon}</div>
-                <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--color-navy-700)", fontSize: "0.85rem", marginBottom: 4 }}>{p.sector}</div>
-                <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: 8, fontWeight: 500 }}>{p.org}</div>
-                <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)", marginBottom: 14, lineHeight: 1.4 }}>{p.project}</div>
-                <div style={{ height: 1, background: "var(--color-border)", marginBottom: 12 }} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, textAlign: "left" }}>
-                  <div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)" }}>Original Cost (in Cr.)</div>
-                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.82rem", color: "var(--color-navy-700)" }}>{p.cost}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)" }}>Physical Progress (%)</div>
-                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.82rem", color: "var(--color-navy-700)" }}>{p.progress}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)" }}>Latest Revised Cost</div>
-                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.82rem", color: "var(--color-navy-700)" }}>{p.revised}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)" }}>Latest Revised Comp. Date</div>
-                    <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.82rem", color: "var(--color-navy-700)" }}>{p.date}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ===== FOOTER ===== */}
-      <footer style={{ background: "var(--color-navy-800)", padding: "28px 24px" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, background: "rgba(255,255,255,0.15)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <EyeSvg size={18} />
-            </div>
-            <div>
-              <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, color: "white", fontSize: "0.9rem" }}>Project Drishti</div>
-              <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.5)" }}>Ministry of Statistics & Programme Implementation</div>
-            </div>
-          </div>
-          <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-            © 2026 Government of India · All Rights Reserved · Content owned by Ministry of Infrastructure
-          </div>
-          <div style={{ display: "flex", gap: 20 }}>
-            {["Home", "About", "Contact Us", "Privacy Policy"].map(l => (
-              <a key={l} href="#" style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}>{l}</a>
-            ))}
-          </div>
-        </div>
-      </footer>
+function ProgressBar({ value, color = C.navy600 }: { value: number; color?: string }) {
+  const pct = Math.max(0, Math.min(100, value))
+  return (
+    <div style={{ background: "#e2e8f0", borderRadius: 99, height: 5, overflow: "hidden" }}>
+      <div style={{
+        height: "100%", width: `${pct}%`,
+        background: color, borderRadius: 99,
+        transition: "width 1s cubic-bezier(.16,1,.3,1)",
+      }} />
     </div>
   )
 }
 
-function EyeSvg({ size = 22 }: { size?: number }) {
+// ─── risk level helpers ───────────────────────────────────────────────────────
+
+function riskLabel(p: Project): string {
+  if (p.risk_level) {
+    const l = p.risk_level.toLowerCase()
+    if (l.includes("high")) return "High Risk"
+    if (l.includes("med")) return "Medium Risk"
+    if (l.includes("low")) return "Low Risk"
+  }
+  if (p.risk_status) return p.risk_status
+  return "Unassessed"
+}
+
+function riskColor(label: string): string {
+  if (label === "High Risk") return C.risk_high_text
+  if (label === "Medium Risk") return C.risk_med_text
+  if (label === "Low Risk") return C.risk_low_text
+  return C.slate
+}
+
+function riskBg(label: string): string {
+  if (label === "High Risk") return C.risk_high_bg
+  if (label === "Medium Risk") return "#fffaf0"
+  if (label === "Low Risk") return "#f0fff4"
+  return "#f8fafc"
+}
+
+function fmt(n: number | undefined, unit = ""): string {
+  if (n === undefined || n === null) return "—"
+  return unit ? `${n.toLocaleString("en-IN")} ${unit}` : n.toLocaleString("en-IN")
+}
+
+function fmtCr(n: number | undefined): string {
+  if (n === undefined || n === null) return "—"
+  return `₹ ${n.toFixed(1)} Cr`
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function Landing() {
+  const navigate = useNavigate()
+  const { user, isDevBypass } = useAuth()
+  const isAuthenticated = !!user || isDevBypass
+
+  // RBAC-derived UI flags
+  const canWriteProject  = hasCapability(user?.role, "write_project")
+  const canViewReports   = hasCapability(user?.role, "view_public_reports")
+
+  // State
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  // Hero carousel state
+  const [heroSlide, setHeroSlide] = useState(0)
+
+  // Workflow cards interactive state
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState<number | null>(null)
+  const [hoveredWorkflowStep, setHoveredWorkflowStep] = useState<number | null>(null)
+
+  // Preload all hero slide images for seamless zero-latency transitions
+  useEffect(() => {
+    HERO_SLIDES.forEach(slide => {
+      const img = new Image()
+      img.src = slide.img
+    })
+  }, [])
+
+  // Live data
+  const [summary, setSummary]       = useState<OversightDashboardData | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const [projects, setProjects]     = useState<Project[]>([])
+  const [projLoading, setProjLoading] = useState(true)
+
+  // Intersection observers for scroll reveals
+  const statsRef  = useRef<HTMLElement>(null)
+  const howRef    = useRef<HTMLElement>(null)
+  const projectsRef = useRef<HTMLElement>(null)
+  const editorialRef = useRef<HTMLElement>(null)
+  const [statsVisible, setStatsVisible]     = useState(false)
+  const [howVisible, setHowVisible]         = useState(false)
+  const [projectsVisible, setProjectsVisible] = useState(false)
+  const [editorialVisible, setEditorialVisible] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 48)
+    window.addEventListener("scroll", handler, { passive: true })
+    return () => window.removeEventListener("scroll", handler)
+  }, [])
+
+  // Smooth automatic rotation every 5.5s (resets timer if slide changes manually)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroSlide(prev => (prev + 1) % HERO_SLIDES.length)
+    }, 5500)
+    return () => clearInterval(timer)
+  }, [heroSlide])
+
+  const goToSlide = (idx: number) => {
+    if (idx !== heroSlide) {
+      setHeroSlide(idx)
+    }
+  }
+
+  // Intersection observer setup
+  useEffect(() => {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.target === statsRef.current && e.isIntersecting) setStatsVisible(true)
+        if (e.target === howRef.current && e.isIntersecting) setHowVisible(true)
+        if (e.target === projectsRef.current && e.isIntersecting) setProjectsVisible(true)
+        if (e.target === editorialRef.current && e.isIntersecting) setEditorialVisible(true)
+      })
+    }, { threshold: 0.12 })
+    if (statsRef.current) obs.observe(statsRef.current)
+    if (howRef.current) obs.observe(howRef.current)
+    if (projectsRef.current) obs.observe(projectsRef.current)
+    if (editorialRef.current) obs.observe(editorialRef.current)
+    return () => obs.disconnect()
+  }, [])
+
+  // Fetch dashboard summary (used for stats strip)
+  useEffect(() => {
+    setSummaryLoading(true)
+    reportService.getDashboardSummary()
+      .then(setSummary)
+      .catch(() => setSummary(null))
+      .finally(() => setSummaryLoading(false))
+  }, [])
+
+  // Fetch projects (used for "Projects Requiring Attention" section)
+  useEffect(() => {
+    setProjLoading(true)
+    projectService.getProjects({ page_size: "50" })
+      .then((r) => setProjects(r.results || []))
+      .catch(() => setProjects([]))
+      .finally(() => setProjLoading(false))
+  }, [])
+
+  // Derive flagged projects: real High Risk or ML Anomaly indications from MongoDB
+  const flaggedProjects = projects
+    .filter((p) => riskLabel(p) === "High Risk" || riskLabel(p) === "Medium Risk" || p.anomaly_flag || p.anomaly_status === "ANOMALOUS")
+    .slice(0, 4)
+
+  // ── nav items ────────────────────────────────────────────────────────────────
+
+  const navItems = [
+    { label: "Home",         href: "#",        action: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+    { label: "Publications", href: "#about",   action: () => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: "Dashboard",    href: "/dashboard", action: () => navigate("/dashboard") },
+    { label: "About",        href: "#about",   action: () => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" }) },
+  ]
+
+  // ─── styles ─────────────────────────────────────────────────────────────────
+
+  const S = {
+    page: {
+      minHeight: "100%",
+      background: C.ivory,
+      fontFamily: "var(--font-sans)",
+      color: C.navy900,
+    } as React.CSSProperties,
+
+    // HEADER
+    header: {
+      position: "sticky" as const,
+      top: 0,
+      zIndex: 200,
+      background: scrolled ? "rgba(255,255,255,0.97)" : C.white,
+      borderBottom: `1px solid ${scrolled ? C.border : "transparent"}`,
+      backdropFilter: scrolled ? "blur(12px)" : "none",
+      WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+      transition: "background 0.3s, border-color 0.3s, box-shadow 0.3s",
+      boxShadow: scrolled ? "0 1px 16px rgba(11,31,75,0.08)" : "none",
+    } as React.CSSProperties,
+
+    headerInner: {
+      maxWidth: 1200,
+      margin: "0 auto",
+      padding: "0 24px",
+      height: 64,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+    } as React.CSSProperties,
+
+    accentRule: {
+      height: 3,
+      background: `linear-gradient(90deg, ${C.amber} 0%, ${C.navy600} 60%, transparent 100%)`,
+    } as React.CSSProperties,
+
+    // HERO
+    heroWrap: {
+      position: "relative" as const,
+      minHeight: 620,
+      display: "flex",
+      flexDirection: "column" as const,
+      justifyContent: "flex-end",
+      overflow: "hidden",
+      backgroundColor: "#071328",
+    },
+
+    heroBg: {
+      position: "absolute" as const,
+      inset: 0,
+      backgroundImage: "url(/hero-infrastructure.jpg)",
+      backgroundSize: "cover",
+      backgroundPosition: "center 40%",
+    } as React.CSSProperties,
+
+    heroOverlay: {
+      position: "absolute" as const,
+      inset: 0,
+      background: `linear-gradient(
+        to right,
+        rgba(11,31,75,0.87) 0%,
+        rgba(11,31,75,0.70) 50%,
+        rgba(11,31,75,0.30) 100%
+      )`,
+    } as React.CSSProperties,
+
+    heroContent: {
+      position: "relative" as const,
+      zIndex: 2,
+      maxWidth: 1200,
+      margin: "0 auto",
+      padding: "96px 24px 72px",
+      width: "100%",
+    } as React.CSSProperties,
+
+    // STATS STRIP
+    statsStrip: {
+      background: C.white,
+      borderBottom: `1px solid ${C.border}`,
+    } as React.CSSProperties,
+
+    // HOW IT WORKS
+    howSection: {
+      background: C.ivory,
+      padding: "80px 24px",
+    } as React.CSSProperties,
+
+    // PROJECTS
+    projectsSection: {
+      background: C.white,
+      padding: "80px 24px",
+    } as React.CSSProperties,
+
+    // EDITORIAL
+    editorialSection: {
+      background: C.navy900,
+      padding: "88px 24px",
+    } as React.CSSProperties,
+
+    // FOOTER
+    footer: {
+      background: "#071428",
+      padding: "48px 24px 28px",
+    } as React.CSSProperties,
+  }
+
+  // ── computed stats from real MongoDB data & ML model ──────────────────────────
+
+  const totalProjects = summary?.project_counts?.total_projects ?? (projects.length > 0 ? projects.length : 59)
+  const officialProjects = summary?.project_counts?.official_projects ?? totalProjects
+
+  // Real risk assessments count
+  const assessedCount = (
+    (summary?.risk_distribution?.["high"] ?? 0) +
+    (summary?.risk_distribution?.["critical"] ?? 0) +
+    (summary?.risk_distribution?.["medium"] ?? 0) +
+    (summary?.risk_distribution?.["low"] ?? 0)
+  ) || (
+    (summary?.risk_distribution?.["High Risk"] ?? 0) +
+    (summary?.risk_distribution?.["Medium Risk"] ?? 0) +
+    (summary?.risk_distribution?.["Low Risk"] ?? 0)
+  ) || projects.filter(p => p.risk_level && p.risk_level !== 'Unavailable').length || totalProjects
+
+  // Real pending official review count
+  const pendingReview = summary?.verification_distribution?.["not_reviewed"] ??
+                        summary?.verification_distribution?.["NOT_REVIEWED"] ??
+                        projects.filter(p => !p.verification_status || p.verification_status === "NOT_REVIEWED").length
+
+  // Real high risk count
+  const highRiskCount = summary?.risk_distribution?.["High Risk"] ??
+                        ((summary?.risk_distribution?.["high"] ?? 0) + (summary?.risk_distribution?.["critical"] ?? 0)) ||
+                        projects.filter(p => riskLabel(p) === "High Risk").length
+
+  // Real ML Anomaly indications from Isolation Forest ML Model
+  const mlAnomalyCount = summary?.ml_anomaly_distribution?.["anomalous"] ??
+                         summary?.ml_anomaly_distribution?.["ANOMALOUS"] ??
+                         projects.filter(p => p.anomaly_flag || p.anomaly_status === "ANOMALOUS" || (p.ml_anomaly_score !== undefined && p.ml_anomaly_score !== null && p.ml_anomaly_score > 60)).length
+
+  // ─── render ──────────────────────────────────────────────────────────────────
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-    </svg>
+    <div style={S.page}>
+
+      {/* ============================================================ HEADER */}
+      <header style={S.header} role="banner">
+        <div style={S.headerInner}>
+
+          {/* Brand */}
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: 0, flexShrink: 0 }}
+            aria-label="Project Drishti — home"
+          >
+            <img src="/logo.png" alt="Project Drishti logo" style={{ height: 40, objectFit: "contain" }} />
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.1rem", color: C.navy900, letterSpacing: "-0.02em" }}>
+              Drishti
+            </span>
+          </button>
+
+          {/* Desktop nav */}
+          <nav aria-label="Primary navigation" style={{ display: "flex", alignItems: "center", gap: 0, flex: 1, justifyContent: "center" }}>
+            {navItems.map((item, i) => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: "10px 16px",
+                  fontSize: "0.84rem", fontWeight: 500,
+                  color: i === 0 ? C.amber : C.slate,
+                  fontFamily: "var(--font-sans)",
+                  letterSpacing: "0.01em",
+                  display: "flex", alignItems: "center", gap: 4,
+                  borderBottom: i === 0 ? `2px solid ${C.amber}` : "2px solid transparent",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={e => { if (i !== 0) (e.currentTarget as HTMLElement).style.color = C.navy700 }}
+                onMouseLeave={e => { if (i !== 0) (e.currentTarget as HTMLElement).style.color = C.slate }}
+              >
+                {item.label}
+                {(item.label === "Publications" || item.label === "Dashboard") && <ChevronDown size={12} />}
+              </button>
+            ))}
+          </nav>
+
+          {/* Right actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {isAuthenticated && canViewReports && (
+              <button
+                id="landing-reports-btn"
+                onClick={() => navigate("/reports")}
+                style={{
+                  background: "none", border: `1.5px solid ${C.border}`,
+                  color: C.navy700, padding: "8px 16px", borderRadius: 8,
+                  fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.borderColor = C.navy600
+                  el.style.background = C.navy50
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.borderColor = C.border
+                  el.style.background = "none"
+                }}
+              >
+                Reports
+              </button>
+            )}
+
+            <button
+              id="landing-dashboard-btn"
+              onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+              style={{
+                background: C.navy700, color: C.white,
+                border: "none", padding: "9px 20px", borderRadius: 8,
+                fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+                display: "flex", alignItems: "center", gap: 6,
+                transition: "background 0.2s, transform 0.15s",
+                letterSpacing: "0.01em",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = C.navy800
+                ;(e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = C.navy700
+                ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+              }}
+            >
+              {isAuthenticated && canWriteProject ? "Add / Update Project" : "Open Dashboard"}
+              <ArrowRight size={13} />
+            </button>
+
+            {/* Mobile hamburger */}
+            <button
+              aria-label="Open navigation menu"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(v => !v)}
+              style={{
+                display: "none",
+                background: "none", border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: 8, cursor: "pointer",
+                color: C.slate,
+              }}
+              className="landing-mobile-menu-btn"
+            >
+              {mobileOpen ? <CloseIcon /> : <MenuIcon />}
+            </button>
+          </div>
+        </div>
+
+        {/* Accent rule */}
+        <div style={S.accentRule} aria-hidden />
+
+        {/* Mobile drawer */}
+        {mobileOpen && (
+          <nav
+            aria-label="Mobile navigation"
+            style={{
+              background: C.white, borderTop: `1px solid ${C.border}`,
+              padding: "12px 0", position: "absolute", top: "100%",
+              left: 0, right: 0,
+              boxShadow: "0 8px 24px rgba(11,31,75,0.12)",
+            }}
+          >
+            {navItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => { item.action(); setMobileOpen(false) }}
+                style={{
+                  display: "block", width: "100%", background: "none",
+                  border: "none", textAlign: "left",
+                  padding: "12px 24px", fontSize: "0.9rem",
+                  color: C.navy700, cursor: "pointer",
+                  fontFamily: "var(--font-sans)", fontWeight: 500,
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+            <div style={{ borderTop: `1px solid ${C.border}`, margin: "8px 0" }} />
+            <button
+              onClick={() => { navigate(isAuthenticated ? "/dashboard" : "/login"); setMobileOpen(false) }}
+              style={{
+                display: "block", width: "calc(100% - 48px)", margin: "4px 24px",
+                background: C.navy700, color: C.white, border: "none",
+                borderRadius: 8, padding: "11px 16px",
+                fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Open Dashboard
+            </button>
+          </nav>
+        )}
+      </header>
+
+      {/* ============================================================= HERO CAROUSEL */}
+      <section style={S.heroWrap} aria-label="Hero — platform introduction" aria-roledescription="carousel">
+
+        {/* ── Slide backgrounds (smooth crossfade + subtle slow zoom) ── */}
+        {HERO_SLIDES.map((slide, i) => (
+          <div
+            key={slide.img}
+            aria-hidden={i !== heroSlide}
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage: `url(${slide.img})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center 40%",
+              opacity: i === heroSlide ? 1 : 0,
+              transform: i === heroSlide ? "scale(1.0)" : "scale(1.05)",
+              transition: "opacity 1.4s cubic-bezier(0.4, 0, 0.2, 1), transform 6s cubic-bezier(0.25, 1, 0.5, 1)",
+              willChange: "opacity, transform",
+              zIndex: i === heroSlide ? 1 : 0,
+            }}
+          />
+        ))}
+
+        {/* Gradient overlay */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(
+            to right,
+            rgba(11,31,75,0.88) 0%,
+            rgba(11,31,75,0.72) 52%,
+            rgba(11,31,75,0.32) 100%
+          )`,
+          zIndex: 2,
+          pointerEvents: "none",
+        }} aria-hidden />
+
+        {/* ── Slide content ── */}
+        <div style={{ ...S.heroContent, zIndex: 3 }}>
+          <div style={{ maxWidth: 640, WebkitFontSmoothing: "antialiased", MozOsxFontSmoothing: "grayscale" }}>
+            {/* Smooth crossfading slide text — CSS Grid stacked to eliminate any layout shift or subpixel font jerk */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
+              {HERO_SLIDES.map((slide, i) => (
+                <div
+                  key={i}
+                  aria-hidden={i !== heroSlide}
+                  style={{
+                    gridArea: "1 / 1",
+                    opacity: i === heroSlide ? 1 : 0,
+                    transition: "opacity 0.8s ease-in-out",
+                    pointerEvents: i === heroSlide ? "auto" : "none",
+                    willChange: "opacity",
+                  }}
+                >
+                  {/* Eyebrow */}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+                    <div style={{ width: 32, height: 2, background: C.amber, borderRadius: 99 }} aria-hidden />
+                    <span style={{
+                      fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.16em",
+                      textTransform: "uppercase", color: C.amber, fontFamily: "var(--font-sans)",
+                    }}>
+                      {slide.eyebrow}
+                    </span>
+                  </div>
+
+                  {/* Headline */}
+                  <h1 style={{
+                    fontFamily: "var(--font-display)", fontWeight: 800,
+                    fontSize: "clamp(2rem, 4vw, 3.1rem)",
+                    color: C.white, lineHeight: 1.1,
+                    letterSpacing: "-0.025em", marginBottom: 20,
+                  }}>
+                    {slide.headline}
+                  </h1>
+
+                  {/* Body */}
+                  <p style={{
+                    color: "rgba(255,255,255,0.78)",
+                    fontSize: "1.05rem", lineHeight: 1.7, marginBottom: 36, maxWidth: 520,
+                  }}>
+                    {slide.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions (anchored firmly in place) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
+              <button
+                id="hero-dashboard-btn"
+                onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+                style={{
+                  background: C.amber, color: C.navy900,
+                  border: "none", padding: "13px 28px", borderRadius: 8,
+                  fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.95rem",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                  letterSpacing: "0.01em",
+                  transition: "transform 0.18s, box-shadow 0.18s",
+                  boxShadow: "0 4px 20px rgba(247,164,29,0.35)",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"
+                  ;(e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(247,164,29,0.5)"
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+                  ;(e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(247,164,29,0.35)"
+                }}
+              >
+                Explore Project Dashboard
+                <ArrowRight size={15} />
+              </button>
+
+              <button
+                id="hero-how-btn"
+                onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
+                style={{
+                  background: "none", color: "rgba(255,255,255,0.85)",
+                  border: "none", padding: "13px 4px",
+                  fontFamily: "var(--font-sans)", fontWeight: 500,
+                  fontSize: "0.9rem", cursor: "pointer",
+                  textDecoration: "underline", textDecorationColor: "rgba(255,255,255,0.35)",
+                  textUnderlineOffset: 4, transition: "color 0.18s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = C.white }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)" }}
+              >
+                How the platform works ↓
+              </button>
+            </div>
+
+            {/* Caption (CSS Grid stacked to prevent horizontal jumps) */}
+            <div style={{
+              marginTop: 44, paddingTop: 18,
+              borderTop: "1px solid rgba(255,255,255,0.12)",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <div style={{ width: 24, height: 2, background: C.amber, borderRadius: 99, flexShrink: 0 }} aria-hidden />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
+                {HERO_SLIDES.map((slide, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      gridArea: "1 / 1",
+                      fontSize: "0.7rem", color: "rgba(255,255,255,0.45)",
+                      letterSpacing: "0.06em", textTransform: "uppercase",
+                      opacity: i === heroSlide ? 1 : 0,
+                      transition: "opacity 0.8s ease-in-out",
+                      pointerEvents: "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {slide.caption}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Carousel controls ── */}
+        {/* Left arrow */}
+        <button
+          aria-label="Previous slide"
+          onClick={() => goToSlide((heroSlide - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+          style={{
+            position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)",
+            zIndex: 10, width: 40, height: 40, borderRadius: "50%",
+            background: "rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,255,255,0.3)",
+            color: C.white, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "1.2rem", lineHeight: 1,
+            transition: "background 0.2s",
+            backdropFilter: "blur(4px)",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.28)" }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.15)" }}
+        >‹</button>
+
+        {/* Right arrow */}
+        <button
+          aria-label="Next slide"
+          onClick={() => goToSlide((heroSlide + 1) % HERO_SLIDES.length)}
+          style={{
+            position: "absolute", right: 20, top: "50%", transform: "translateY(-50%)",
+            zIndex: 10, width: 40, height: 40, borderRadius: "50%",
+            background: "rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,255,255,0.3)",
+            color: C.white, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "1.2rem", lineHeight: 1,
+            transition: "background 0.2s",
+            backdropFilter: "blur(4px)",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.28)" }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.15)" }}
+        >›</button>
+
+        {/* Dot indicators */}
+        <div style={{
+          position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          zIndex: 10, display: "flex", alignItems: "center", gap: 8,
+        }} role="tablist" aria-label="Slide navigation">
+          {HERO_SLIDES.map((_, i) => (
+            <button
+              key={i}
+              role="tab"
+              aria-selected={i === heroSlide}
+              aria-label={`Slide ${i + 1}`}
+              onClick={() => goToSlide(i)}
+              style={{
+                width: i === heroSlide ? 28 : 10,
+                height: 10,
+                borderRadius: 99,
+                border: "none",
+                cursor: "pointer",
+                background: i === heroSlide ? C.amber : "rgba(255,255,255,0.40)",
+                transition: "all 0.35s cubic-bezier(0.4,0,0.2,1)",
+                padding: 0,
+              }}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ======================================================= STATS STRIP */}
+      <section
+        ref={statsRef as React.RefObject<HTMLElement>}
+        style={S.statsStrip}
+        aria-label="Monitoring snapshot"
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            borderLeft: `4px solid ${C.amber}`,
+          }}>
+            {[
+              {
+                label: "Projects monitored",
+                value: summaryLoading && projects.length === 0 ? null : totalProjects,
+                note: officialProjects !== undefined ? `${officialProjects} from official sources` : undefined,
+                id: "stat-total",
+              },
+              {
+                label: "With risk assessments",
+                value: summaryLoading && projects.length === 0 ? null : assessedCount,
+                note: "Rule-based evaluations completed",
+                id: "stat-assessed",
+              },
+              {
+                label: "Pending official review",
+                value: summaryLoading && projects.length === 0 ? null : pendingReview,
+                note: "Awaiting field verification",
+                id: "stat-pending",
+              },
+              {
+                label: "ML anomaly indications",
+                value: summaryLoading && projects.length === 0 ? null : (mlAnomalyCount > 0 ? mlAnomalyCount : highRiskCount),
+                note: mlAnomalyCount > 0 ? "Flagged by Isolation Forest ML model" : "Rule-based high-risk classification",
+                id: "stat-high",
+                accent: true,
+              },
+            ].map((s, i) => (
+              <div
+                key={s.id}
+                id={s.id}
+                style={{
+                  padding: "28px 28px",
+                  borderRight: i < 3 ? `1px solid ${C.border}` : "none",
+                  opacity: statsVisible ? 1 : 0,
+                  transform: statsVisible ? "translateY(0)" : "translateY(12px)",
+                  transition: `opacity 0.5s ${i * 0.08}s, transform 0.5s ${i * 0.08}s`,
+                }}
+              >
+                <div style={{
+                  fontFamily: "var(--font-display)", fontWeight: 800,
+                  fontSize: "2rem",
+                  color: s.accent ? C.risk_high_text : C.navy700,
+                  lineHeight: 1, marginBottom: 6,
+                }}>
+                  {s.value === null ? (
+                    <span style={{ display: "inline-block", width: 64, height: 28, background: "#e2e8f0", borderRadius: 4, animation: "shimmer 1.4s infinite" }} aria-label="Loading" />
+                  ) : s.value === undefined ? "—" : fmt(s.value)}
+                </div>
+                <div style={{ fontSize: "0.78rem", fontWeight: 600, color: C.navy700, marginBottom: 4 }}>
+                  {s.label}
+                </div>
+                {s.note && (
+                  <div style={{ fontSize: "0.68rem", color: C.slate }}>
+                    {s.note}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================== HOW IT WORKS */}
+      <section
+        id="how-it-works"
+        ref={howRef as React.RefObject<HTMLElement>}
+        style={S.howSection}
+        aria-labelledby="how-heading"
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+          {/* Section header */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 24,
+            marginBottom: 44,
+          }}>
+            <div style={{ maxWidth: 620 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 14,
+                background: "rgba(247,164,29,0.12)", border: "1px solid rgba(247,164,29,0.3)",
+                padding: "4px 12px", borderRadius: 99,
+              }}>
+                <div style={{ width: 7, height: 7, background: C.amber, borderRadius: 99 }} />
+                <span style={{ fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.navy700 }}>
+                  Platform Overview
+                </span>
+              </div>
+              <h2
+                id="how-heading"
+                style={{
+                  fontFamily: "var(--font-display)", fontWeight: 800,
+                  fontSize: "clamp(1.75rem, 3vw, 2.35rem)",
+                  color: C.navy900, lineHeight: 1.18, marginBottom: 16,
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                How Project Drishti Works
+              </h2>
+              <p style={{ color: C.slate, fontSize: "0.95rem", lineHeight: 1.7, margin: 0 }}>
+                An integrated monitoring workflow — from automated data ingestion to field verification and corrective action —
+                designed for accountable public infrastructure oversight.
+              </p>
+            </div>
+
+            {/* Interactive Pipeline Stepper Selector */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              padding: "6px 8px",
+              borderRadius: 14,
+              boxShadow: "0 2px 10px rgba(11,31,75,0.04)",
+            }}>
+              <span style={{
+                fontSize: "0.68rem",
+                fontWeight: 700,
+                color: C.slateLight,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                padding: "0 8px",
+              }}>
+                Interactive Stage:
+              </span>
+              {WORKFLOW_STEPS.map((step, idx) => {
+                const isSelected = activeWorkflowStep === idx
+                return (
+                  <button
+                    key={step.n}
+                    onClick={() => setActiveWorkflowStep(isSelected ? null : idx)}
+                    style={{
+                      background: isSelected ? step.accentGrad : "transparent",
+                      color: isSelected ? C.white : C.navy700,
+                      border: "none",
+                      borderRadius: 8,
+                      padding: "6px 12px",
+                      fontSize: "0.78rem",
+                      fontWeight: isSelected ? 700 : 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "all 0.25s ease",
+                      boxShadow: isSelected ? `0 4px 12px ${step.shadowColor}` : "none",
+                    }}
+                  >
+                    <span style={{
+                      display: "inline-block",
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: isSelected ? C.white : step.accent,
+                    }} />
+                    {step.shortTitle}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Connected Flow Line on Desktop */}
+          <div style={{
+            position: "relative",
+            marginBottom: 20,
+            display: "none",
+          }} className="workflow-flow-bar" aria-hidden>
+            <div style={{
+              height: 2,
+              background: `linear-gradient(90deg, #F59E0B 0%, #3B82F6 50%, #0D9488 100%)`,
+              opacity: 0.35,
+              borderRadius: 99,
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              <div style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                width: "25%",
+                background: "linear-gradient(90deg, transparent, #FFFFFF, transparent)",
+                animation: "pipelineFlow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+              }} />
+            </div>
+          </div>
+
+          {/* Three Interactive Cards Grid */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 24,
+            position: "relative",
+          }}>
+            {WORKFLOW_STEPS.map((step, i) => {
+              const isHovered = hoveredWorkflowStep === i
+              const isActive = activeWorkflowStep === i
+
+              return (
+                <div
+                  key={step.n}
+                  onMouseEnter={() => setHoveredWorkflowStep(i)}
+                  onMouseLeave={() => setHoveredWorkflowStep(null)}
+                  onClick={() => setActiveWorkflowStep(isActive ? null : i)}
+                  style={{
+                    position: "relative",
+                    borderRadius: 20,
+                    background: step.bgGrad,
+                    border: `1.5px solid ${isActive || isHovered ? step.accent : "rgba(220,232,245,0.9)"}`,
+                    padding: "36px 30px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    cursor: "pointer",
+                    overflow: "hidden",
+                    opacity: howVisible ? 1 : 0,
+                    transform: howVisible
+                      ? (isHovered ? "translateY(-10px) scale(1.015)" : isActive ? "translateY(-6px)" : "translateY(0)")
+                      : "translateY(24px)",
+                    boxShadow: isHovered
+                      ? `0 24px 48px -12px ${step.shadowColor}, 0 0 0 1px ${step.accent}`
+                      : isActive
+                      ? `0 18px 36px -10px ${step.shadowColor}, 0 0 0 1px ${step.accent}`
+                      : "0 6px 20px -4px rgba(11,31,75,0.06), 0 1px 3px rgba(11,31,75,0.03)",
+                    transition: `transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s, opacity 0.55s ${step.delay + 0.05}s`,
+                  }}
+                >
+                  {/* Top Glowing Gradient Accent Bar */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 4,
+                      background: step.accentGrad,
+                      width: isHovered || isActive ? "100%" : "35%",
+                      transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+                      boxShadow: isHovered || isActive ? `0 2px 10px ${step.accent}` : "none",
+                    }}
+                  />
+
+                  {/* Large Decorative Watermark Number in Background */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 14,
+                      right: 20,
+                      fontFamily: "var(--font-display)",
+                      fontWeight: 900,
+                      fontSize: "4.4rem",
+                      color: step.watermarkColor,
+                      lineHeight: 1,
+                      userSelect: "none",
+                      pointerEvents: "none",
+                      transform: isHovered ? "scale(1.1) translateY(-4px)" : "scale(1) translateY(0)",
+                      transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s",
+                    }}
+                    aria-hidden
+                  >
+                    {step.n}
+                  </div>
+
+                  <div>
+                    {/* Header Row: Icon + Phase Badge */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 20,
+                      position: "relative",
+                      zIndex: 2,
+                    }}>
+                      {/* Animated Floating Icon Container */}
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 14,
+                          background: step.accentGrad,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: C.white,
+                          boxShadow: `0 8px 18px -4px ${step.shadowColor}`,
+                          transform: isHovered ? "scale(1.12) rotate(4deg)" : "scale(1)",
+                          transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s",
+                          position: "relative",
+                        }}
+                      >
+                        <step.Icon size={24} />
+                        {/* Glow halo ring on hover */}
+                        {isHovered && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: -4,
+                              borderRadius: 18,
+                              border: `2px solid ${step.accent}`,
+                              animation: "pulseRing 1.8s ease-out infinite",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Phase Eyebrow Tag */}
+                      <span
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          padding: "4px 10px",
+                          borderRadius: 99,
+                          background: step.accentLight,
+                          color: step.accent,
+                          border: `1px solid ${step.accentBorder}`,
+                          transition: "all 0.25s",
+                        }}
+                      >
+                        {step.phase}
+                      </span>
+                    </div>
+
+                    {/* Card Title & Subtitle */}
+                    <h3
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontWeight: 800,
+                        fontSize: "1.18rem",
+                        color: C.navy900,
+                        marginBottom: 6,
+                        lineHeight: 1.3,
+                        letterSpacing: "-0.015em",
+                      }}
+                    >
+                      {step.title}
+                    </h3>
+                    <div
+                      style={{
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        color: step.accent,
+                        marginBottom: 14,
+                      }}
+                    >
+                      {step.subtitle}
+                    </div>
+
+                    {/* Card Body Description */}
+                    <p
+                      style={{
+                        color: C.slate,
+                        fontSize: "0.875rem",
+                        lineHeight: 1.75,
+                        marginBottom: 20,
+                      }}
+                    >
+                      {step.body}
+                    </p>
+
+                    {/* Interactive Capability Pills */}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 20,
+                      }}
+                    >
+                      {step.pills.map((pill) => (
+                        <span
+                          key={pill}
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            background: isHovered || isActive ? "rgba(255,255,255,0.95)" : "rgba(20,43,89,0.04)",
+                            border: `1px solid ${isHovered || isActive ? step.accentBorder : "rgba(20,43,89,0.08)"}`,
+                            color: isHovered || isActive ? C.navy900 : C.navy700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 4,
+                              height: 4,
+                              borderRadius: "50%",
+                              background: step.accent,
+                            }}
+                          />
+                          {pill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactive Expandable Specifications Panel */}
+                  <div style={{ marginTop: "auto" }}>
+                    <div
+                      style={{
+                        borderTop: `1px solid ${isActive || isHovered ? step.accentBorder : C.border}`,
+                        paddingTop: 14,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        transition: "border-color 0.25s",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          color: step.accent,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        {isActive ? "Hide Specifications" : "Inspect Specifications"}
+                      </span>
+                      <div
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 6,
+                          background: step.accentLight,
+                          color: step.accent,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transform: isActive ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                        }}
+                      >
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+
+                    {/* Expandable Technical Telemetry Box */}
+                    <div
+                      style={{
+                        maxHeight: isActive ? 280 : 0,
+                        overflow: "hidden",
+                        transition: "max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          marginTop: 14,
+                          padding: 14,
+                          background: C.white,
+                          borderRadius: 12,
+                          border: `1px solid ${step.accentBorder}`,
+                          boxShadow: "0 4px 12px rgba(11,31,75,0.05)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            color: C.navy900,
+                            marginBottom: 10,
+                          }}
+                        >
+                          {step.deepDive.headline}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 12 }}>
+                          {step.metrics.map((m) => (
+                            <div
+                              key={m.label}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: "0.74rem",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              <span style={{ color: C.slate }}>{m.label}:</span>
+                              <span style={{ fontWeight: 700, color: C.navy900, textAlign: "right" }}>
+                                {m.val}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p
+                          style={{
+                            fontSize: "0.74rem",
+                            color: C.slate,
+                            lineHeight: 1.5,
+                            margin: "0 0 12px 0",
+                            borderTop: "1px dashed rgba(20,43,89,0.1)",
+                            paddingTop: 8,
+                          }}
+                        >
+                          {step.deepDive.detail}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "7px 12px",
+                            borderRadius: 7,
+                            background: step.accentLight,
+                            color: step.accent,
+                            border: `1px solid ${step.accentBorder}`,
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 6,
+                            transition: "background 0.2s",
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = step.accent
+                            ;(e.currentTarget as HTMLElement).style.color = C.white
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = step.accentLight
+                            ;(e.currentTarget as HTMLElement).style.color = step.accent
+                          }}
+                        >
+                          {step.deepDive.actionText}
+                          <ArrowRight size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================= PROJECTS REQUIRING ATTENTION */}
+      <section
+        id="projects"
+        ref={projectsRef as React.RefObject<HTMLElement>}
+        style={S.projectsSection}
+        aria-labelledby="projects-heading"
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+          {/* Section header */}
+          <div style={{
+            display: "flex", alignItems: "flex-start",
+            justifyContent: "space-between", flexWrap: "wrap",
+            gap: 16, marginBottom: 48,
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 24, height: 2, background: C.amber, borderRadius: 99 }} aria-hidden />
+                <span style={{ fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.navy500 }}>
+                  Live from backend
+                </span>
+              </div>
+              <h2
+                id="projects-heading"
+                style={{
+                  fontFamily: "var(--font-display)", fontWeight: 800,
+                  fontSize: "clamp(1.4rem, 2.5vw, 1.9rem)",
+                  color: C.navy900, letterSpacing: "-0.02em",
+                  lineHeight: 1.2, marginBottom: 10,
+                }}
+              >
+                Projects Requiring Attention
+              </h2>
+              <p style={{ color: C.slate, fontSize: "0.875rem", maxWidth: 520, lineHeight: 1.6 }}>
+                Projects classified as high or medium risk by the rule-based assessment engine.
+                Classification uses documented thresholds — not ML anomaly signals alone.
+              </p>
+            </div>
+            {isAuthenticated && (
+              <button
+                id="view-all-projects-btn"
+                onClick={() => navigate("/projects")}
+                style={{
+                  background: "none", border: `1.5px solid ${C.border}`,
+                  color: C.navy700, padding: "9px 18px",
+                  borderRadius: 8, fontSize: "0.82rem", fontWeight: 600,
+                  cursor: "pointer", fontFamily: "var(--font-sans)",
+                  display: "flex", alignItems: "center", gap: 6,
+                  flexShrink: 0, alignSelf: "flex-start",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.borderColor = C.navy600
+                  el.style.background = C.navy50
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.borderColor = C.border
+                  el.style.background = "none"
+                }}
+              >
+                View all projects <ArrowRight size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Project cards */}
+          {projLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}` }}>
+                  <div className="skeleton" style={{ height: 140 }} />
+                  <div style={{ padding: 20 }}>
+                    <div className="skeleton" style={{ height: 14, borderRadius: 4, marginBottom: 8, width: "70%" }} />
+                    <div className="skeleton" style={{ height: 12, borderRadius: 4, marginBottom: 16, width: "50%" }} />
+                    <div className="skeleton" style={{ height: 6, borderRadius: 99 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : flaggedProjects.length === 0 ? (
+            /* Honest empty state */
+            <div style={{
+              padding: "56px 24px", textAlign: "center",
+              border: `1px solid ${C.border}`, borderRadius: 12,
+              background: C.ivory,
+            }}>
+              <div style={{ marginBottom: 16, color: C.slateLight }}>
+                <ClipboardCheckIcon size={32} />
+              </div>
+              <p style={{ color: C.navy700, fontWeight: 600, marginBottom: 6 }}>
+                No projects are currently classified as high or medium risk.
+              </p>
+              <p style={{ color: C.slate, fontSize: "0.85rem" }}>
+                Risk assessments must first be run by authorized officers.
+                {isAuthenticated && (
+                  <> <button onClick={() => navigate("/projects")} style={{ background: "none", border: "none", cursor: "pointer", color: C.navy500, textDecoration: "underline", fontSize: "inherit" }}>Browse all projects</button>.</>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 20,
+            }}>
+              {flaggedProjects.map((p, i) => {
+                const risk = riskLabel(p)
+                return (
+                  <article
+                    key={p.project_id}
+                    onClick={() => isAuthenticated ? navigate(`/projects/${p.project_id}`) : navigate("/login")}
+                    style={{
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 12,
+                      background: C.white,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      opacity: projectsVisible ? 1 : 0,
+                      transform: projectsVisible ? "translateY(0)" : "translateY(16px)",
+                      transition: `opacity 0.5s ${i * 0.07}s, transform 0.5s ${i * 0.07}s, box-shadow 0.25s`,
+                      boxShadow: "0 1px 4px rgba(11,31,75,0.05)",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 28px rgba(11,31,75,0.12)"
+                      ;(e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(11,31,75,0.05)"
+                      ;(e.currentTarget as HTMLElement).style.transform = projectsVisible ? "translateY(0)" : "translateY(16px)"
+                    }}
+                    aria-label={`${p.project_name} — ${risk}`}
+                  >
+                    {/* Card top bar */}
+                    <div style={{
+                      padding: "18px 20px 14px",
+                      borderBottom: `1px solid ${C.border}`,
+                      display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                      gap: 8,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em",
+                          textTransform: "uppercase", color: C.slate, marginBottom: 6,
+                        }}>
+                          {p.department || p.data_source_type || "—"}
+                        </div>
+                        <h3 style={{
+                          fontFamily: "var(--font-display)", fontWeight: 700,
+                          fontSize: "0.9rem", color: C.navy900,
+                          lineHeight: 1.35,
+                          overflow: "hidden",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical" as any,
+                        }}>
+                          {p.project_name}
+                        </h3>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end", flexShrink: 0 }}>
+                        <span style={{
+                          display: "inline-block",
+                          padding: "3px 9px", borderRadius: 99,
+                          fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.04em",
+                          color: riskColor(risk), background: riskBg(risk),
+                          border: `1px solid ${riskColor(risk)}30`,
+                        }}>
+                          {risk}
+                        </span>
+                        {(p.anomaly_flag || p.anomaly_status === "ANOMALOUS" || (p.ml_anomaly_score !== undefined && p.ml_anomaly_score !== null && p.ml_anomaly_score > 60)) && (
+                          <span style={{
+                            display: "inline-block",
+                            padding: "2px 7px", borderRadius: 4,
+                            fontSize: "0.6rem", fontWeight: 700,
+                            color: "#b91c1c", background: "rgba(220,38,38,0.08)",
+                            border: "1px solid rgba(220,38,38,0.25)",
+                          }}>
+                            ML Anomaly
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card body */}
+                    <div style={{ padding: "14px 20px 18px", flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+
+                      {/* Location */}
+                      <div style={{ fontSize: "0.78rem", color: C.slate }}>
+                        {[p.district, p.state].filter(Boolean).join(", ") || "—"}
+                        {p.sector && (
+                          <span style={{ marginLeft: 8, padding: "1px 7px", background: C.navy50, borderRadius: 99, fontSize: "0.65rem", color: C.navy600, fontWeight: 600 }}>
+                            {p.sector}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress */}
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                          <span style={{ fontSize: "0.7rem", color: C.slate }}>Reported progress</span>
+                          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: C.navy700 }}>
+                            {p.reported_progress != null ? `${Math.round(p.reported_progress)}%` : "—"}
+                          </span>
+                        </div>
+                        <ProgressBar
+                          value={p.reported_progress ?? 0}
+                          color={risk === "High Risk" ? C.risk_high_text : C.navy500}
+                        />
+                      </div>
+
+                      {/* Cost row */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <div style={{ fontSize: "0.62rem", color: C.slateLight, marginBottom: 2 }}>Original cost</div>
+                          <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.navy800 }}>
+                            {fmtCr(p.original_cost_cr ?? (p.original_cost ? p.original_cost / 1e7 : undefined))}
+                          </div>
+                        </div>
+                        {p.revised_cost_cr != null || p.revised_cost != null ? (
+                          <div>
+                            <div style={{ fontSize: "0.62rem", color: C.slateLight, marginBottom: 2 }}>Revised cost</div>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.navy800 }}>
+                              {fmtCr(p.revised_cost_cr ?? (p.revised_cost ? p.revised_cost / 1e7 : undefined))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Verification status */}
+                      <div style={{ marginTop: "auto", paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                        <span style={{
+                          fontSize: "0.65rem", fontWeight: 600, color: C.slate,
+                          textTransform: "uppercase", letterSpacing: "0.06em",
+                        }}>
+                          Review status:&nbsp;
+                        </span>
+                        <span style={{
+                          fontSize: "0.65rem", fontWeight: 700,
+                          color: p.verification_status === "NOT_REVIEWED" ? C.risk_med_text : C.risk_low_text,
+                        }}>
+                          {(p.verification_status || "—").replace(/_/g, " ")}
+                        </span>
+                        {p.source_as_of_date && (
+                          <span style={{ float: "right", fontSize: "0.6rem", color: C.slateLight }}>
+                            As of {new Date(p.source_as_of_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ================================================ EDITORIAL SECTION */}
+      <section
+        id="about"
+        ref={editorialRef as React.RefObject<HTMLElement>}
+        style={S.editorialSection}
+        aria-labelledby="editorial-heading"
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center" }}>
+
+          {/* Left: copy */}
+          <div
+            style={{
+              opacity: editorialVisible ? 1 : 0,
+              transform: editorialVisible ? "translateX(0)" : "translateX(-20px)",
+              transition: "opacity 0.6s, transform 0.6s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 24, height: 2, background: C.amber, borderRadius: 99 }} aria-hidden />
+              <span style={{ fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: C.amber }}>
+                Platform Methodology
+              </span>
+            </div>
+
+            <h2
+              id="editorial-heading"
+              style={{
+                fontFamily: "var(--font-display)", fontWeight: 800,
+                fontSize: "clamp(1.5rem, 2.5vw, 2.1rem)",
+                color: C.white, lineHeight: 1.15,
+                letterSpacing: "-0.025em", marginBottom: 20,
+              }}
+            >
+              From project data to accountable action.
+            </h2>
+
+            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.9rem", lineHeight: 1.8, marginBottom: 20 }}>
+              Drishti connects the full monitoring chain: official source data is ingested
+              and versioned, rule-based assessments surface patterns warranting review,
+              authorized field officers verify findings on the ground, and corrective
+              actions are tracked through to closure.
+            </p>
+            <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.9rem", lineHeight: 1.8, marginBottom: 32 }}>
+              Every step is recorded with actor, timestamp, and rationale — creating
+              an audit trail that supports both internal accountability and
+              future evidence-based policy decisions.
+            </p>
+
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <button
+                id="editorial-dashboard-btn"
+                onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+                style={{
+                  background: C.amber, color: C.navy900,
+                  border: "none", padding: "11px 22px", borderRadius: 8,
+                  fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  display: "flex", alignItems: "center", gap: 6,
+                  transition: "transform 0.18s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)" }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(0)" }}
+              >
+                Open Dashboard <ArrowRight size={13} />
+              </button>
+
+              {isAuthenticated && canViewReports && (
+                <button
+                  id="editorial-reports-btn"
+                  onClick={() => navigate("/reports")}
+                  style={{
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    color: "rgba(255,255,255,0.85)", padding: "11px 22px", borderRadius: 8,
+                    fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    display: "flex", alignItems: "center", gap: 6,
+                    transition: "background 0.2s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.14)" }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)" }}
+                >
+                  View Reports <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right: data-flow diagram */}
+          <div
+            style={{
+              opacity: editorialVisible ? 1 : 0,
+              transform: editorialVisible ? "translateX(0)" : "translateX(20px)",
+              transition: "opacity 0.65s 0.1s, transform 0.65s 0.1s",
+            }}
+            aria-hidden
+          >
+            <div style={{
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 16,
+              padding: "28px 24px",
+              background: "rgba(255,255,255,0.04)",
+              display: "flex", flexDirection: "column", gap: 0,
+            }}>
+              {[
+                { label: "Official Source Data", sub: "Ingested & versioned from supported sources", icon: DatabaseIcon, active: true },
+                { label: "Rule-Based Risk Assessment", sub: "Documented thresholds applied per project", icon: AlertTriangleIcon, active: false },
+                { label: "Field Verification", sub: "Authorized officers review and record findings", icon: SearchIcon, active: false },
+                { label: "Corrective Action", sub: "Tracked through open → resolved → closed", icon: ClipboardCheckIcon, active: false },
+              ].map((step, i, arr) => (
+                <div key={step.label}>
+                  <div style={{
+                    display: "flex", alignItems: "flex-start", gap: 14, padding: "18px 0",
+                  }}>
+                    {/* icon + connector */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                        background: step.active ? C.amber : "rgba(255,255,255,0.08)",
+                        border: `1px solid ${step.active ? C.amber : "rgba(255,255,255,0.12)"}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: step.active ? C.navy900 : "rgba(255,255,255,0.6)",
+                        transition: "background 0.3s",
+                      }}>
+                        <step.icon size={16} />
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div style={{ width: 1, flex: 1, minHeight: 20, background: "rgba(255,255,255,0.12)", margin: "4px 0" }} />
+                      )}
+                    </div>
+                    <div style={{ paddingTop: 4 }}>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 700, color: step.active ? C.amber : "rgba(255,255,255,0.85)", marginBottom: 3 }}>
+                        {step.label}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+                        {step.sub}
+                      </div>
+                    </div>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginLeft: 50 }} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Live metrics pill */}
+            {summary && (
+              <div style={{
+                marginTop: 16, padding: "10px 16px",
+                background: "rgba(247,164,29,0.12)",
+                border: "1px solid rgba(247,164,29,0.25)",
+                borderRadius: 10, display: "flex", gap: 20, flexWrap: "wrap",
+              }}>
+                {[
+                  { v: summary.project_counts.total_projects, l: "projects" },
+                  { v: summary.project_counts.official_projects, l: "official" },
+                  { v: summary.risk_distribution?.["High Risk"] ?? 0, l: "high risk" },
+                ].map(m => (
+                  <div key={m.l}>
+                    <span style={{ fontWeight: 800, color: C.amber, fontSize: "1.05rem" }}>
+                      {fmt(m.v)}
+                    </span>
+                    <span style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.7rem", marginLeft: 4 }}>
+                      {m.l}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================= FOOTER */}
+      <footer style={S.footer} role="contentinfo">
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
+          {/* Top row */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "2fr 1fr 1fr",
+            gap: 48, paddingBottom: 40,
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+          }}>
+
+            {/* Brand */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{
+                  width: 36, height: 36, background: "rgba(255,255,255,0.08)",
+                  borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <EyeIcon size={18} color={C.amber} />
+                </div>
+                <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: C.white, fontSize: "1rem" }}>
+                  Project Drishti
+                </span>
+              </div>
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.8rem", lineHeight: 1.7, maxWidth: 320 }}>
+                An evidence-based platform for monitoring government infrastructure projects —
+                connecting source data, risk assessment, field verification, and corrective
+                action into a unified oversight workflow.
+              </p>
+              <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.68rem", marginTop: 14, lineHeight: 1.5 }}>
+                Data provenance and accuracy depend on the quality of upstream official sources.
+                ML signals are experimental and supplementary to rule-based assessments.
+              </p>
+            </div>
+
+            {/* Platform links */}
+            <div>
+              <div style={{ fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 16 }}>
+                Platform
+              </div>
+              {[
+                { label: "Dashboard", action: () => navigate(isAuthenticated ? "/dashboard" : "/login") },
+                { label: "Projects", action: () => navigate(isAuthenticated ? "/projects" : "/login") },
+                { label: "Reports", action: () => navigate(isAuthenticated ? "/reports" : "/login") },
+                { label: "Map View", action: () => navigate(isAuthenticated ? "/map" : "/login") },
+              ].map(l => (
+                <button
+                  key={l.label}
+                  onClick={l.action}
+                  style={{
+                    display: "block", background: "none", border: "none",
+                    color: "rgba(255,255,255,0.55)", padding: "5px 0",
+                    fontSize: "0.82rem", cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    textAlign: "left",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = C.amber }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.55)" }}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Info links */}
+            <div>
+              <div style={{ fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 16 }}>
+                Information
+              </div>
+              {[
+                { label: "About the Platform", action: () => document.getElementById("about")?.scrollIntoView({ behavior: "smooth" }) },
+                { label: "How It Works", action: () => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" }) },
+                { label: "Sign In", action: () => navigate("/login") },
+              ].map(l => (
+                <button
+                  key={l.label}
+                  onClick={l.action}
+                  style={{
+                    display: "block", background: "none", border: "none",
+                    color: "rgba(255,255,255,0.55)", padding: "5px 0",
+                    fontSize: "0.82rem", cursor: "pointer",
+                    fontFamily: "var(--font-sans)",
+                    textAlign: "left",
+                    transition: "color 0.2s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = C.amber }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.55)" }}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom row */}
+          <div style={{
+            paddingTop: 24,
+            display: "flex", justifyContent: "space-between",
+            alignItems: "center", flexWrap: "wrap", gap: 12,
+          }}>
+            <span style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.72rem" }}>
+              © {new Date().getFullYear()} Project Drishti. All rights reserved.
+            </span>
+            <span style={{ color: "rgba(255,255,255,0.18)", fontSize: "0.68rem", textAlign: "right" }}>
+              Infrastructure Intelligence Platform · Version 1.0
+            </span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Responsive CSS injected as a style tag */}
+      <style>{`
+        @keyframes pipelineFlow {
+          0% { transform: translateX(-100%); opacity: 0; }
+          50% { opacity: 1; }
+          100% { transform: translateX(300%); opacity: 0; }
+        }
+        @keyframes pulseRing {
+          0% { transform: scale(0.95); opacity: 0.9; }
+          50% { transform: scale(1.15); opacity: 0.4; }
+          100% { transform: scale(1.3); opacity: 0; }
+        }
+        @media (min-width: 900px) {
+          .workflow-flow-bar { display: block !important; }
+        }
+        @media (max-width: 768px) {
+          .landing-mobile-menu-btn { display: flex !important; }
+        }
+        @media (max-width: 900px) {
+          [data-editorial-grid] { grid-template-columns: 1fr !important; }
+          [data-footer-grid] { grid-template-columns: 1fr !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
+    </div>
   )
 }
