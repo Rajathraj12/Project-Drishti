@@ -15,12 +15,9 @@
   },
   "routes": [
     { "path": "/admin", "roles": ["ADMIN"] },
-    { "path": "/risk-analysis", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
-    { "path": "/projects/:id/why-flagged", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"] },
     { "path": "/inspections", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"] },
     { "path": "/contractors", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
     { "path": "/contractors/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
-    { "path": "/contractor/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER"] },
     { "path": "/actions", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"] },
     { "path": "/evidence", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY"] },
     { "path": "/dashboard", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "IMPLEMENTING_AGENCY", "CITIZEN"] },

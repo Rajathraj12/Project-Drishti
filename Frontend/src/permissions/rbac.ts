@@ -72,7 +72,6 @@ export const NAV_ITEMS: { label: string; path: string }[] = [
   { label: 'Evidence', path: '/evidence' },
   { label: 'Contractors', path: '/contractors' },
   { label: 'Reports', path: '/reports' },
-  { label: 'Risk Analysis', path: '/risk-analysis' },
   { label: 'Citizen Report', path: '/report' },
   { label: 'Admin', path: '/admin' },
 ]
