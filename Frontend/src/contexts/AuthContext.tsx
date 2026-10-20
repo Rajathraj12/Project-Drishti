@@ -30,21 +30,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isDevBypass = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
 
+  const DEFAULT_DEV_USER: User = {
+    id: "dev-01",
+    username: "PMO Executive",
+    email: "executive@drishti.gov.in",
+    role: "ADMIN",
+    department: "National Infrastructure Oversight",
+  };
+
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token && !isDevBypass) {
       setUser(null);
       return null;
     }
-    const u = await authService.getCurrentUser();
-    const role = normalizeRole(u.role);
-    if (!role) {
+    try {
+      const u = await authService.getCurrentUser();
+      const role = normalizeRole(u.role);
+      const normalized = { ...u, role: role || (isDevBypass ? "ADMIN" : u.role) };
+      setUser(normalized);
+      return normalized;
+    } catch {
+      if (isDevBypass) {
+        const storedRole = normalizeRole(localStorage.getItem('dev_role') || "ADMIN") || "ADMIN";
+        const devUser = { ...DEFAULT_DEV_USER, role: storedRole };
+        setUser(devUser);
+        return devUser;
+      }
       setUser(null);
       return null;
     }
-    const normalized = { ...u, role };
-    setUser(normalized);
-    return normalized;
   }, [isDevBypass]);
 
   useEffect(() => {
@@ -55,7 +70,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .catch(() => {
           if (!cancelled) {
             localStorage.removeItem('token');
-            if (!isDevBypass) setUser(null);
+            if (isDevBypass) {
+              const storedRole = normalizeRole(localStorage.getItem('dev_role') || "ADMIN") || "ADMIN";
+              setUser({ ...DEFAULT_DEV_USER, role: storedRole });
+            } else {
+              setUser(null);
+            }
           }
         })
         .finally(() => {

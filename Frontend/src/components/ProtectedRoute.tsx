@@ -1,18 +1,22 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import DrishtiLoader from './DrishtiLoader';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isDevBypass } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return <div style={{ padding: 40, textAlign: "center" }}>Loading application...</div>;
+    return (
+      <DrishtiLoader
+        title="Initializing Drishti Platform..."
+        subtitle="Verifying secure credentials and jurisdiction"
+        fullScreen={true}
+      />
+    );
   }
 
-  if (!user) {
-    if (isDevBypass) {
-      return <div style={{ padding: 40, textAlign: "center" }}>Initializing development identity...</div>;
-    }
+  if (!user && !isDevBypass) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

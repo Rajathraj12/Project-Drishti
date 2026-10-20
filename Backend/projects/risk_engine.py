@@ -119,9 +119,9 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
     total_score = min(max(int(round(total_score)), 0), 100)
     
     # Classification
-    if total_score >= 70:
+    if total_score >= 60:
         risk_level = "High"
-    elif total_score >= 40:
+    elif total_score >= 35:
         risk_level = "Medium"
     else:
         risk_level = "Low"

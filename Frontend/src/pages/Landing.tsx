@@ -302,7 +302,7 @@ function fmt(n: number | undefined, unit = ""): string {
 
 function fmtCr(n: number | undefined): string {
   if (n === undefined || n === null) return "—"
-  return `₹ ${n.toFixed(1)} Cr`
+  return `₹ ${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Cr`
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -1730,14 +1730,14 @@ export default function Landing() {
                         <div>
                           <div style={{ fontSize: "0.62rem", color: C.slateLight, marginBottom: 2 }}>Original cost</div>
                           <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.navy800 }}>
-                            {fmtCr(p.original_cost_cr ?? (p.original_cost ? p.original_cost / 1e7 : undefined))}
+                            {fmtCr(p.original_cost_cr ?? p.original_cost)}
                           </div>
                         </div>
                         {p.revised_cost_cr != null || p.revised_cost != null ? (
                           <div>
                             <div style={{ fontSize: "0.62rem", color: C.slateLight, marginBottom: 2 }}>Revised cost</div>
                             <div style={{ fontSize: "0.8rem", fontWeight: 700, color: C.navy800 }}>
-                              {fmtCr(p.revised_cost_cr ?? (p.revised_cost ? p.revised_cost / 1e7 : undefined))}
+                              {fmtCr(p.revised_cost_cr ?? p.revised_cost)}
                             </div>
                           </div>
                         ) : null}

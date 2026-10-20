@@ -4,6 +4,7 @@ import { projectService } from "../services/projectService";
 import { Project } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { hasCapability } from "../permissions/rbac";
+import DrishtiLoader from "../components/DrishtiLoader";
 
 export default function ProjectsList() {
   const { user } = useAuth();
@@ -56,7 +57,14 @@ export default function ProjectsList() {
     });
   }, [projects, selectedState, selectedSector, search]);
 
-  if (loading) return <div style={{ padding: 24 }}>Loading projects...</div>;
+  if (loading) {
+    return (
+      <DrishtiLoader
+        title="Loading official projects..."
+        subtitle="Accessing PAIMANA Central Federated Records"
+      />
+    );
+  }
   if (error) return <div style={{ padding: 24, color: "red" }}>Error: {error}</div>;
 
   return (

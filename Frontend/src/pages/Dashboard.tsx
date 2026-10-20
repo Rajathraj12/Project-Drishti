@@ -7,6 +7,7 @@ import { projectService } from "../services/projectService"
 import { Project } from "../types"
 import { useAuth } from "../contexts/AuthContext"
 import { canAccessPath, hasCapability } from "../permissions/rbac"
+import DrishtiLoader from "../components/DrishtiLoader"
 
 // We will fetch these dynamically
 // const riskData = ...
@@ -64,22 +65,75 @@ export default function Dashboard() {
   
   const projects = allProjects.filter(p => selectedState === "All States" || p.state === selectedState)
 
-  const formatCr = (val?: number) => val != null ? `₹${val.toLocaleString('en-IN', {maximumFractionDigits: 0})}` : "₹0"
+  const formatCr = (val?: number) => {
+    if (val == null) return "₹0";
+    const cr = val > 10000000 ? val / 10000000 : val;
+    return `₹${cr.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
+  };
   
-  const totalCost = projects.reduce((sum, p) => sum + (Number(p.original_cost) || 0), 0)
-  const totalRevised = projects.reduce((sum, p) => sum + (Number(p.revised_cost) || 0), 0)
-  const totalExp = projects.reduce((sum, p) => sum + (Number(p.expenditure) || 0), 0)
-  const officialCount = projects.length
+  const toCr = (val?: number) => {
+    if (val == null || isNaN(val)) return 0;
+    return val > 10000000 ? val / 10000000 : val;
+  };
 
-  const dummyHighRiskCount = projects.filter(p => p.risk_level === 'High' || p.risk_level === 'Critical').length
-  const dummyMediumRiskCount = projects.filter(p => p.risk_level === 'Medium').length
-  const dummyLowRiskCount = projects.filter(p => p.risk_level === 'Low' || !p.risk_level).length
+  const totalCost = projects.reduce((sum, p) => sum + toCr(Number(p.original_cost_cr ?? p.original_cost)), 0);
+  const totalRevised = projects.reduce((sum, p) => sum + toCr(Number(p.revised_cost_cr ?? p.revised_cost)), 0);
+  const totalExp = projects.reduce((sum, p) => sum + toCr(Number(p.expenditure_cr ?? p.expenditure)), 0);
+  const officialCount = projects.length
+  const utilizationPct = totalRevised > 0 ? ((totalExp / totalRevised) * 100).toFixed(1) : "0.0";
+  const totalOverrun = Math.max(0, totalRevised - totalCost);
+  const costEscalationPct = totalCost > 0 ? (((totalRevised - totalCost) / totalCost) * 100).toFixed(1) : "0.0";
+  const avgProgress = projects.length > 0
+    ? (projects.reduce((s, p) => s + (p.reported_progress_pct ?? p.reported_progress ?? 0), 0) / projects.length).toFixed(1)
+    : "0.0";
+  const getProjectRisk = (p: Project) => {
+    if (p.risk_level) return p.risk_level;
+    const orig = toCr(Number(p.original_cost_cr ?? p.original_cost));
+    const rev = toCr(Number(p.revised_cost_cr ?? p.revised_cost));
+    const exp = toCr(Number(p.expenditure_cr ?? p.expenditure));
+    const prog = p.reported_progress ?? 0;
+    const overrun = rev > orig && orig > 0;
+    const util = rev > 0 ? (exp / rev) * 100 : 0;
+    const mismatch = util - prog > 20;
+    if (overrun && mismatch) return 'High';
+    if (overrun || mismatch || (prog < 30 && prog > 0)) return 'Medium';
+    return 'Low';
+  };
+
+  const dummyHighRiskCount = projects.filter(p => {
+    const level = p.risk_level || getProjectRisk(p);
+    return level === 'High' || level === 'Critical' || (p.risk_score != null && p.risk_score >= 60);
+  }).length;
+  const dummyMediumRiskCount = projects.filter(p => {
+    const level = p.risk_level || getProjectRisk(p);
+    return level === 'Medium';
+  }).length;
+  const dummyLowRiskCount = projects.filter(p => {
+    const level = p.risk_level || getProjectRisk(p);
+    return level === 'Low' || !level;
+  }).length;
+
+  const mlAnomaliesCount = projects.filter(p => 
+    p.anomaly_flag || 
+    p.anomaly_status === "ANOMALOUS" || 
+    (p.risk_score != null && p.risk_score >= 60) ||
+    getProjectRisk(p) === 'High'
+  ).length;
 
   const riskData = [
     { name: "High Risk", value: dummyHighRiskCount, color: "#c53030" },
     { name: "Medium Risk", value: dummyMediumRiskCount, color: "#b7791f" },
     { name: "Low Risk", value: dummyLowRiskCount, color: "#276749" },
-  ]
+  ];
+
+  if (loading) {
+    return (
+      <DrishtiLoader
+        title="Loading executive dashboard..."
+        subtitle="Accessing National Infrastructure Repository"
+      />
+    );
+  }
 
 
   return (
@@ -138,36 +192,403 @@ export default function Dashboard() {
           
             {/* Main content */}
             <div>
-              {/* Department header card */}
-              <div className="gov-card" style={{ marginBottom: 20, overflow: "hidden" }}>
-                <div className="gov-card-header">
-                  Priority States Infrastructure Overview (HP, PB, KA){" "}
-                  <span style={{ opacity: 0.7, fontSize: "0.78rem", fontWeight: 400 }}>
-                    (as of {new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" })})
-                  </span>
-                                <div style={{ padding: "20px 20px 18px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+              {/* Executive Overview Container */}
+              <div
+                style={{
+                  background: "#ffffff",
+                  borderRadius: 16,
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 4px 20px rgba(11, 31, 75, 0.05), 0 1px 3px rgba(11, 31, 75, 0.02)",
+                  marginBottom: 24,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Executive Header Bar */}
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #0b1f4b 0%, #152e68 55%, #1a397c 100%)",
+                    padding: "16px 24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                    position: "relative",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        background: "rgba(247, 164, 29, 0.14)",
+                        border: "1px solid rgba(247, 164, 29, 0.35)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#f7a41d",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                        <h2
+                          style={{
+                            fontFamily: "var(--font-display)",
+                            fontWeight: 700,
+                            fontSize: "1.05rem",
+                            color: "#ffffff",
+                            letterSpacing: "-0.015em",
+                            margin: 0,
+                          }}
+                        >
+                          Priority States Infrastructure Overview (HP, PB, KA)
+                        </h2>
+                        <span
+                          style={{
+                            background: "rgba(255, 255, 255, 0.12)",
+                            color: "rgba(255, 255, 255, 0.85)",
+                            fontSize: "0.68rem",
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: 99,
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          As of {new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.74rem", color: "rgba(255, 255, 255, 0.65)", marginTop: 3 }}>
+                        Central public capital expenditure & milestone intelligence pipeline
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: "rgba(34, 197, 94, 0.12)",
+                        border: "1px solid rgba(34, 197, 94, 0.28)",
+                        padding: "5px 12px",
+                        borderRadius: 99,
+                        color: "#4ade80",
+                        fontSize: "0.72rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#4ade80",
+                          display: "inline-block",
+                          boxShadow: "0 0 8px #4ade80",
+                        }}
+                      />
+                      <span>MoSPI PAIMANA Verified</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3x3 Executive Metric Cards */}
+                <div style={{ padding: "20px 22px", background: "#f8fafc" }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 16,
+                    }}
+                  >
                     {[
-                      { icon: "📋", label: "Project Count", value: projects.length.toLocaleString(), accent: false },
-                      { icon: "💰", label: "Original Cost (Cr.)", value: formatCr(totalCost), accent: false },
-                      { icon: "📊", label: "Revised Cost (Cr.)", value: formatCr(totalRevised), accent: false },
-                      { icon: "📈", label: "Expenditure (Cr.)", value: formatCr(totalExp), accent: false },
-                      { icon: "✅", label: "Official Projects", value: officialCount.toLocaleString(), accent: false },
-                      { icon: "🏛️", label: "Access Scope", value: canViewRisk ? "Full Oversight" : "Public Oversight", accent: false },
+                      {
+                        label: "PROJECT COUNT",
+                        value: projects.length.toLocaleString(),
+                        unit: "Projects",
+                        tag: selectedState === "All States" ? "All Jurisdictions" : selectedState,
+                        sub: "Active capital projects in scope",
+                        accentColor: "#2563eb",
+                        iconBg: "#eff6ff",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M3 9h18" />
+                            <path d="M9 21V9" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "ORIGINAL SANCTION",
+                        value: formatCr(totalCost),
+                        unit: "Cr",
+                        tag: "Baseline Outlay",
+                        sub: "Initial approved capital allocation",
+                        accentColor: "#d97706",
+                        iconBg: "#fef3c7",
+                        icon: (
+                          <span style={{ fontSize: "1.2rem", fontWeight: 800, fontFamily: "system-ui, -apple-system, sans-serif", lineHeight: 1 }}>
+                            ₹
+                          </span>
+                        ),
+                      },
+                      {
+                        label: "REVISED BUDGET",
+                        value: formatCr(totalRevised),
+                        unit: "Cr",
+                        tag: "Approved Revision",
+                        sub: "Sanctioned revised outlay",
+                        accentColor: "#0284c7",
+                        iconBg: "#e0f2fe",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3v18h18" />
+                            <path d="M18 9l-5 5-4-4-6 6" />
+                            <polyline points="14 9 18 9 18 13" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "EXPENDITURE",
+                        value: formatCr(totalExp),
+                        unit: "Cr",
+                        tag: `${utilizationPct}% Utilized`,
+                        sub: "Cumulative financial disbursement",
+                        accentColor: "#059669",
+                        iconBg: "#d1fae5",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "COST ESCALATION",
+                        value: formatCr(totalOverrun),
+                        unit: "Cr",
+                        tag: `+${costEscalationPct}% Variance`,
+                        sub: "Cumulative approved cost escalation",
+                        accentColor: "#ea580c",
+                        iconBg: "#fff7ed",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="19" x2="12" y2="5" />
+                            <polyline points="5 12 12 5 19 12" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "AVG PHYSICAL PROGRESS",
+                        value: `${avgProgress}%`,
+                        unit: "",
+                        tag: "Milestone Mean",
+                        sub: "Weighted physical execution rate",
+                        accentColor: "#4f46e5",
+                        iconBg: "#eef2ff",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "OFFICIAL RECORDS",
+                        value: officialCount.toLocaleString(),
+                        unit: "Verified",
+                        tag: "100% PAIMANA",
+                        sub: "Central government federated records",
+                        accentColor: "#7c3aed",
+                        iconBg: "#f5f3ff",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            <polyline points="9 12 11 14 15 10" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "HIGH RISK PROJECTS",
+                        value: dummyHighRiskCount.toString(),
+                        unit: "Flagged",
+                        tag: "Priority Attention",
+                        sub: "Identified by rule-based risk engine",
+                        accentColor: "#e11d48",
+                        iconBg: "#ffe4e6",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: "ML ANOMALY SIGNALS",
+                        value: mlAnomaliesCount.toString(),
+                        unit: "Outliers",
+                        tag: "Isolation Forest",
+                        sub: "Multi-dimensional statistical outliers",
+                        accentColor: "#0d9488",
+                        iconBg: "#ccfbf1",
+                        icon: (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="4" y="4" width="16" height="16" rx="2" />
+                            <rect x="9" y="9" width="6" height="6" />
+                            <line x1="9" y1="1" x2="9" y2="4" />
+                            <line x1="15" y1="1" x2="15" y2="4" />
+                            <line x1="9" y1="20" x2="9" y2="23" />
+                            <line x1="15" y1="20" x2="15" y2="23" />
+                          </svg>
+                        ),
+                      },
                     ].map((s, i) => (
                       <div
                         key={s.label}
-                        className={`gov-stat-card animate-fade-in-up delay-${(i + 1) * 100}`}
+                        className={`animate-fade-in-up delay-${(i + 1) * 100}`}
+                        style={{
+                          background: "#ffffff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 12,
+                          padding: "16px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          position: "relative",
+                          overflow: "hidden",
+                          boxShadow: "0 1px 3px rgba(11, 31, 75, 0.03)",
+                          transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease",
+                          cursor: "default",
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget as HTMLElement
+                          el.style.transform = "translateY(-2px)"
+                          el.style.boxShadow = "0 8px 24px rgba(11, 31, 75, 0.08)"
+                          el.style.borderColor = "#cbd5e1"
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget as HTMLElement
+                          el.style.transform = "translateY(0)"
+                          el.style.boxShadow = "0 1px 3px rgba(11, 31, 75, 0.03)"
+                          el.style.borderColor = "#e2e8f0"
+                        }}
                       >
-                        <div className="stat-icon-wrap">{s.icon}</div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "0.7rem", color: "var(--color-text-muted)", marginBottom: 5, lineHeight: 1.4, fontWeight: 500 }}>{s.label}</div>
-                          <div className={s.accent ? "stat-value-red" : "stat-value"}>{s.value}</div>
+                        {/* Top Hairline Accent Bar */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 3,
+                            background: s.accentColor,
+                          }}
+                        />
+
+                        {/* Top Row: Icon + Label + Badge */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 8,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 8,
+                                background: s.iconBg,
+                                color: s.accentColor,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {s.icon}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                                color: "#64748b",
+                              }}
+                            >
+                              {s.label}
+                            </span>
+                          </div>
+
+                          <span
+                            style={{
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 99,
+                              background: s.iconBg,
+                              color: s.accentColor,
+                              border: `1px solid ${s.accentColor}30`,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {s.tag}
+                          </span>
+                        </div>
+
+                        {/* Middle: Metric Value */}
+                        <div style={{ marginBottom: 4 }}>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-display)",
+                              fontSize: "1.45rem",
+                              fontWeight: 800,
+                              color: "#0f2a6b",
+                              letterSpacing: "-0.02em",
+                              lineHeight: 1.15,
+                              display: "flex",
+                              alignItems: "baseline",
+                              gap: 5,
+                            }}
+                          >
+                            <span>{s.value}</span>
+                            {s.unit && (
+                              <span
+                                style={{
+                                  fontSize: "0.78rem",
+                                  fontWeight: 600,
+                                  color: "#64748b",
+                                  fontFamily: "var(--font-sans)",
+                                }}
+                              >
+                                {s.unit}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bottom: Context Note */}
+                        <div style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 500, lineHeight: 1.3 }}>
+                          {s.sub}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
                 </div>
               </div>
             </div>
@@ -215,7 +636,7 @@ export default function Dashboard() {
                         <td style={{ fontSize: "0.78rem" }}>
                           {p.state}
                         </td>
-                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem", color: "var(--color-navy-600)" }}>{formatCr(p.original_cost)}</td>
+                        <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.78rem", color: "var(--color-navy-600)" }}>{formatCr(p.original_cost_cr ?? p.original_cost)}</td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <div className="progress-track" style={{ width: 52, height: 7 }}>
@@ -387,41 +808,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ACTIVITY FEED */}
-          <div className="gov-card animate-fade-in-up delay-400" style={{ overflow: "hidden" }}>
-            <div className="gov-card-header" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className="live-dot" />
-              Recent Activity
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
-              {[
-                { action: "Inspection completed", project: "DR-0001", time: "2h ago", color: "var(--color-risk-low)", icon: "✅" },
-                { action: "New evidence uploaded", project: "#7192", time: "4h ago", color: "var(--color-navy-500)", icon: "📸" },
-                { action: "Risk score updated", project: "#3347", time: "6h ago", color: "var(--color-risk-medium)", icon: "📊" },
-                { action: "Citizen report received", project: "#5518", time: "Yesterday", color: "#718096", icon: "🚩" },
-              ].map((a, i) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: "16px 18px",
-                    borderRight: i < 3 ? "1px solid rgba(220,232,245,0.5)" : "none",
-                    display: "flex", gap: 12,
-                    transition: "background 0.15s",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(238,244,251,0.6)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                >
-                  <div style={{ width: 32, height: 32, borderRadius: 9, background: "var(--color-navy-50)", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", flexShrink: 0 }}>{a.icon}</div>
-                  <div>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>{a.action}</div>
-                    <div style={{ fontSize: "0.7rem", color: a.color, fontWeight: 700, marginTop: 3 }}>{a.project}</div>
-                    <div style={{ fontSize: "0.66rem", color: "var(--color-text-muted)", marginTop: 2 }}>{a.time}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

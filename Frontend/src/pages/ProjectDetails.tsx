@@ -6,6 +6,7 @@ import { correctiveActionService } from "../services/correctiveActionService"
 import { Project, CorrectiveAction } from "../types"
 import { useAuth } from "../contexts/AuthContext"
 import { canAccessPath, hasCapability } from "../permissions/rbac"
+import DrishtiLoader from "../components/DrishtiLoader"
 
 const formatCostCr = (val?: number | null) => {
   if (val == null || isNaN(val)) return "₹0.00 Cr"
@@ -234,10 +235,10 @@ export default function ProjectDetails() {
   
   if (loading) {
     return (
-      <div className="p-12 text-center text-slate-500">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-navy-700 mb-3" />
-        <div className="text-sm font-semibold">Loading official project data...</div>
-      </div>
+      <DrishtiLoader
+        title="Loading official project data..."
+        subtitle="National Infrastructure Oversight Platform"
+      />
     );
   }
 
@@ -353,7 +354,7 @@ export default function ProjectDetails() {
             )}
             {canViewEvidence && (
             <button
-              onClick={() => navigate("/evidence")}
+              onClick={() => navigate(`/evidence?projectId=${id}`)}
               className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg hover:bg-navy-700 font-500 transition-colors"
             >
               View Evidence
