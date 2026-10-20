@@ -4,7 +4,6 @@ export const ROLES = [
   'ADMIN',
   'GOVERNMENT_OFFICER',
   'FIELD_OFFICER',
-  'IMPLEMENTING_AGENCY',
   'CITIZEN',
 ] as const
 
@@ -67,12 +66,13 @@ export const NAV_ITEMS: { label: string; path: string }[] = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Projects', path: '/projects' },
   { label: 'Map View', path: '/map' },
-  { label: 'Corrective Actions', path: '/actions' },
+  { label: 'Contractors', path: '/contractors' },
   { label: 'Inspections', path: '/inspections' },
   { label: 'Evidence', path: '/evidence' },
-  { label: 'Contractors', path: '/contractors' },
+  { label: 'Corrective Actions', path: '/actions' },
   { label: 'Reports', path: '/reports' },
   { label: 'Citizen Report', path: '/report' },
+  { label: 'My Reports', path: '/my-reports' },
   { label: 'Admin', path: '/admin' },
 ]
 

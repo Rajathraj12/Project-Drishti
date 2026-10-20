@@ -8,6 +8,7 @@ import Evidence from "./pages/Evidence"
 import Inspections from "./pages/Inspections"
 import ContractorProfile from "./pages/ContractorProfile"
 import CitizenReport from "./pages/CitizenReport"
+import MyReports from "./pages/MyReports"
 import Admin from "./pages/Admin"
 import AppShell from "./layouts/AppShell"
 import ProjectsList from "./pages/ProjectsList"
@@ -36,7 +37,9 @@ export default function App() {
             <Route path="/inspections" element={<Inspections />} />
             <Route path="/contractors" element={<ContractorsList />} />
             <Route path="/contractors/:id" element={<ContractorProfile />} />
+            <Route path="/contractor/:id" element={<ContractorProfile />} />
             <Route path="/report" element={<CitizenReport />} />
+            <Route path="/my-reports" element={<MyReports />} />
             <Route path="/citizen-portal" element={<Navigate to="/report" replace />} />
             <Route path="/admin" element={<Admin />} />
           </Route>

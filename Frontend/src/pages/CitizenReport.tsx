@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { citizenReportService } from "../services/citizenReportService"
 
 type ReportStep = "form" | "submitted"
 
@@ -20,7 +22,9 @@ const issueTypes = [
 ]
 
 export default function CitizenReport() {
+  const navigate = useNavigate()
   const [step, setStep] = useState<ReportStep>("form")
+  const [generatedRef, setGeneratedRef] = useState<string>("RPT-2026-00847")
   const [form, setForm] = useState({
     projectId: "",
     issueType: "",
@@ -31,23 +35,31 @@ export default function CitizenReport() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const report = citizenReportService.submitReport({
+      projectId: form.projectId,
+      issueType: form.issueType,
+      description: form.description,
+      location: form.location,
+      photoName: photoName || undefined,
+    })
+    setGeneratedRef(report.referenceNo)
     setStep("submitted")
   }
 
   if (step === "submitted") {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center mt-8">
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center mt-8 shadow-sm">
           <div className="w-16 h-16 bg-risk-low-bg rounded-full flex items-center justify-center mx-auto mb-5">
-            <span className="text-3xl">✓</span>
+            <span className="text-3xl text-risk-low">✓</span>
           </div>
-          <h2 className="font-display font-700 text-2xl text-navy-900 mb-2">Report Received</h2>
-          <p className="text-slate-500 text-sm mb-2">Your report has been received and assigned reference number:</p>
-          <div className="font-mono font-700 text-navy-800 text-lg bg-navy-50 px-4 py-2 rounded-xl inline-block mb-6">
-            RPT-2026-00847
+          <h2 className="font-display font-700 text-2xl text-navy-900 mb-2">Report Submitted Successfully</h2>
+          <p className="text-slate-500 text-sm mb-2">Your report has been forwarded to the monitoring officers and assigned reference number:</p>
+          <div className="font-mono font-700 text-navy-800 text-xl bg-navy-50 px-5 py-2.5 rounded-xl inline-block mb-6 border border-navy-100">
+            {generatedRef}
           </div>
           <p className="text-slate-400 text-xs mb-8">
-            You can track the status of your report using this reference number. Updates will be sent if you provided contact details.
+            Government Officers and Supervisors have been notified. You can track this report's real-time review status under "My Reports".
           </p>
 
           {/* Status tracker */}
@@ -62,23 +74,35 @@ export default function CitizenReport() {
                   }`}>
                     {i === 0 ? "✓" : i + 1}
                   </div>
-                  <div className={`text-[10px] mt-1.5 font-500 ${i === 0 ? "text-risk-low" : "text-slate-300"}`}>
+                  <div className={`text-[10px] mt-1.5 font-500 ${i === 0 ? "text-risk-low font-700" : "text-slate-400"}`}>
                     {s.label}
                   </div>
                 </div>
                 {i < steps.length - 1 && (
-                  <div className={`w-12 h-0.5 mb-4 ${i === 0 ? "bg-slate-200" : "bg-slate-100"}`}></div>
+                  <div className={`w-12 h-0.5 mb-4 ${i === 0 ? "bg-slate-300" : "bg-slate-100"}`}></div>
                 )}
               </div>
             ))}
           </div>
 
-          <button
-            onClick={() => setStep("form")}
-            className="text-sm bg-navy-800 text-white px-6 py-2.5 rounded-xl font-600 hover:bg-navy-700 transition-colors"
-          >
-            Submit Another Report
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => navigate("/my-reports")}
+              className="text-sm bg-navy-800 text-white px-6 py-2.5 rounded-xl font-600 hover:bg-navy-700 transition-colors shadow-sm"
+            >
+              Track in My Reports
+            </button>
+            <button
+              onClick={() => {
+                setForm({ projectId: "", issueType: "", description: "", location: "" })
+                setPhotoName(null)
+                setStep("form")
+              }}
+              className="text-sm bg-slate-100 text-slate-700 px-6 py-2.5 rounded-xl font-600 hover:bg-slate-200 transition-colors"
+            >
+              Submit Another Report
+            </button>
+          </div>
         </div>
       </div>
     )

@@ -7,13 +7,13 @@ const iconByPath: Record<string, typeof GridIcon> = {
   "/dashboard": GridIcon,
   "/projects": LayersIcon,
   "/map": MapIcon,
-  "/actions": CheckCircleIcon,
   "/inspections": ClipboardIcon,
   "/evidence": ShieldIcon,
+  "/actions": CheckCircleIcon,
   "/contractors": BuildingIcon,
   "/reports": ClipboardIcon,
-  "/risk-analysis": ShieldIcon,
   "/report": ClipboardIcon,
+  "/my-reports": ClipboardIcon,
   "/admin": BuildingIcon,
 }
 

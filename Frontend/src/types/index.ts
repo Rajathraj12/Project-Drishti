@@ -2,7 +2,6 @@ export type UserRole =
   | 'ADMIN'
   | 'GOVERNMENT_OFFICER'
   | 'FIELD_OFFICER'
-  | 'IMPLEMENTING_AGENCY'
   | 'CITIZEN';
 
 export interface User {

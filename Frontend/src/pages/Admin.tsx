@@ -1,136 +1,230 @@
-import { useState } from "react"
+import React, { useState } from "react"
 
-type AdminTab = "users" | "projects" | "departments" | "contractors" | "settings"
-
-const users = [
-  { id: "U001", name: "R. Sharma", email: "r.sharma@gov.in", role: "Government Officer", dept: "Rural Development", status: "Active", lastLogin: "10 Sep 2026" },
-  { id: "U002", name: "K. Rajan", email: "k.rajan@gov.in", role: "Field Inspector", dept: "Infrastructure", status: "Active", lastLogin: "9 Sep 2026" },
-  { id: "U003", name: "S. Nair", email: "s.nair@gov.in", role: "Field Inspector", dept: "Urban Development", status: "Active", lastLogin: "10 Sep 2026" },
-  { id: "U004", name: "P. Kumar", email: "p.kumar@gov.in", role: "Senior Officer", dept: "Finance", status: "Active", lastLogin: "8 Sep 2026" },
-  { id: "U005", name: "M. Reddy", email: "m.reddy@gov.in", role: "Field Inspector", dept: "Rural Development", status: "Inactive", lastLogin: "2 Sep 2026" },
-  { id: "U006", name: "A. Pillai", email: "a.pillai@gov.in", role: "Admin", dept: "IT", status: "Active", lastLogin: "10 Sep 2026" },
-]
-
-const departments = [
-  { name: "Rural Development", projects: 342, budget: "₹218 Cr", officers: 8 },
-  { name: "Urban Development", projects: 287, budget: "₹195 Cr", officers: 6 },
-  { name: "Infrastructure", projects: 198, budget: "₹312 Cr", officers: 5 },
-  { name: "Water Resources", projects: 156, budget: "₹89 Cr", officers: 4 },
-  { name: "Education", projects: 143, budget: "₹67 Cr", officers: 7 },
-  { name: "Health", projects: 122, budget: "₹78 Cr", officers: 5 },
-]
-
-const contractors = [
-  { name: "ABC Infrastructure Pvt. Ltd.", projects: 18, delayed: 5, risk: 72 },
-  { name: "Karnataka Build Corp", projects: 24, delayed: 2, risk: 45 },
-  { name: "Sri Venkateshwara Constructions", projects: 12, delayed: 3, risk: 58 },
-  { name: "National Roads & Bridges Ltd.", projects: 31, delayed: 6, risk: 67 },
-  { name: "Deccan Civil Works", projects: 9, delayed: 1, risk: 38 },
-]
-
-const roleColor: Record<string, string> = {
-  "Admin": "bg-navy-100 text-navy-700",
-  "Government Officer": "bg-accent-100 text-accent-600",
-  "Senior Officer": "bg-purple-100 text-purple-700",
-  "Field Inspector": "bg-slate-100 text-slate-600",
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  department: string
+  status: "Active" | "Inactive"
 }
 
-export default function Admin() {
-  const [tab, setTab] = useState<AdminTab>("users")
+const INITIAL_USERS: User[] = [
+  { id: "1", name: "Rajesh Sharma", email: "r.sharma@gov.in", role: "Government Officer", department: "Rural Development", status: "Active" },
+  { id: "2", name: "Sunita Rao", email: "s.rao@pwd.gov.in", role: "Field Inspector", department: "Public Works (PWD)", status: "Active" },
+  { id: "3", name: "Anand Verma", email: "a.verma@nic.in", role: "Administrator", department: "IT & Administration", status: "Active" },
+  { id: "4", name: "M. K. Deshmukh", email: "deshmukh@nhai.gov.in", role: "Government Officer", department: "NHAI Highways", status: "Active" },
+  { id: "5", name: "Pooja Sundaram", email: "p.sundaram@gov.in", role: "Government Officer", department: "Finance & Accounts", status: "Active" },
+  { id: "6", name: "K. Narayanaswamy", email: "k.swamy@treasury.gov.in", role: "Field Inspector", department: "State Finance", status: "Inactive" },
+]
 
-  const tabs: { k: AdminTab; label: string; icon: string }[] = [
-    { k: "users", label: "Users", icon: "👤" },
-    { k: "projects", label: "Projects", icon: "📁" },
-    { k: "departments", label: "Departments", icon: "🏛️" },
-    { k: "contractors", label: "Contractors", icon: "🏗️" },
-    { k: "settings", label: "Settings", icon: "⚙️" },
-  ]
+const DEPARTMENTS = [
+  { name: "Public Works Department (PWD)", projects: 28, budget: "₹340 Cr", officers: 12 },
+  { name: "Rural Development", projects: 45, budget: "₹210 Cr", officers: 16 },
+  { name: "National Highways (NHAI)", projects: 14, budget: "₹580 Cr", officers: 8 },
+  { name: "Water Resources", projects: 19, budget: "₹145 Cr", officers: 6 },
+]
+
+export default function Admin() {
+  const [activeTab, setActiveTab] = useState<"users" | "departments" | "settings">("users")
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS)
+  const [search, setSearch] = useState("")
+  const [roleFilter, setRoleFilter] = useState("ALL")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // New user form state
+  const [newName, setNewName] = useState("")
+  const [newEmail, setNewEmail] = useState("")
+  const [newRole, setNewRole] = useState("Field Inspector")
+  const [newDept, setNewDept] = useState("Public Works (PWD)")
+
+  // Toggle user active/inactive
+  const toggleStatus = (id: string) => {
+    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === "Active" ? "Inactive" : "Active" } : u))
+  }
+
+  // Add new user
+  const handleAddUser = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newName.trim() || !newEmail.trim()) return
+
+    const user: User = {
+      id: Date.now().toString(),
+      name: newName.trim(),
+      email: newEmail.trim(),
+      role: newRole,
+      department: newDept,
+      status: "Active"
+    }
+    setUsers([user, ...users])
+    setNewName("")
+    setNewEmail("")
+    setIsModalOpen(false)
+  }
+
+  // Filter users
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
+    const matchesRole = roleFilter === "ALL" || u.role === roleFilter
+    return matchesSearch && matchesRole
+  })
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Simple Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
-          <h1 className="font-display font-700 text-2xl text-navy-900">Administration</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Manage users, projects, departments, and system settings</p>
+          <h1 className="text-2xl font-bold text-navy-900 font-display">Admin Portal</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage system users, departments, and general settings.</p>
         </div>
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          <span className="text-amber-500 text-sm">⚠️</span>
-          <span className="text-xs text-amber-700 font-500">Admin access — changes are logged</span>
+        {activeTab === "users" && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-navy-800 hover:bg-navy-900 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <span>+</span> Add User
+          </button>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="text-xs text-slate-500 font-medium uppercase">Total Users</div>
+          <div className="text-2xl font-bold text-navy-900 mt-1">{users.length}</div>
+          <div className="text-xs text-emerald-600 mt-0.5 font-medium">{users.filter(u => u.status === "Active").length} active accounts</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="text-xs text-slate-500 font-medium uppercase">Departments</div>
+          <div className="text-2xl font-bold text-navy-900 mt-1">{DEPARTMENTS.length}</div>
+          <div className="text-xs text-slate-500 mt-0.5 font-medium">106 monitored projects</div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="text-xs text-slate-500 font-medium uppercase">System Status</div>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">Normal</div>
+          <div className="text-xs text-slate-500 mt-0.5 font-medium">All services connected</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1.5 w-fit">
-        {tabs.map(t => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k)}
-            className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-500 transition-colors ${
-              tab === t.k
-                ? "bg-navy-800 text-white"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            <span>{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
+      <div className="flex gap-2 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "users"
+              ? "border-navy-800 text-navy-900"
+              : "border-transparent text-slate-500 hover:text-navy-900"
+          }`}
+        >
+          Users ({users.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("departments")}
+          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "departments"
+              ? "border-navy-800 text-navy-900"
+              : "border-transparent text-slate-500 hover:text-navy-900"
+          }`}
+        >
+          Departments
+        </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`pb-2.5 px-4 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === "settings"
+              ? "border-navy-800 text-navy-900"
+              : "border-transparent text-slate-500 hover:text-navy-900"
+          }`}
+        >
+          Settings
+        </button>
       </div>
 
-      {/* Users tab */}
-      {tab === "users" && (
+      {/* TAB 1: USERS */}
+      {activeTab === "users" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-600 text-navy-900">User Management</h2>
-            <button className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg font-600 hover:bg-navy-700 transition-colors">
-              + Add User
-            </button>
+          {/* Search & Filter */}
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-72 px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600 bg-white"
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600 bg-white"
+            >
+              <option value="ALL">All Roles</option>
+              <option value="Government Officer">Government Officer</option>
+              <option value="Field Inspector">Field Inspector</option>
+              <option value="Administrator">Administrator</option>
+            </select>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+
+          {/* User Table */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50">
-                    {["User", "Role", "Department", "Status", "Last Login", "Actions"].map(h => (
-                      <th key={h} className="text-left px-6 py-3 text-xs font-600 text-slate-400 uppercase tracking-wider">{h}</th>
-                    ))}
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Department</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {users.map(u => (
-                    <tr key={u.id} className="table-row-hover">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-navy-100 rounded-full flex items-center justify-center text-sm font-700 text-navy-700 flex-shrink-0">
-                            {u.name.split(" ").map(n => n[0]).join("")}
-                          </div>
-                          <div>
-                            <div className="font-500 text-slate-800 text-sm">{u.name}</div>
-                            <div className="text-xs text-slate-400">{u.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-600 px-2 py-0.5 rounded-full ${roleColor[u.role] || "bg-slate-100 text-slate-600"}`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-500">{u.dept}</td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs font-600 px-2 py-0.5 rounded-full ${u.status === "Active" ? "bg-risk-low-bg text-risk-low" : "bg-slate-100 text-slate-400"}`}>
-                          {u.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-mono text-slate-400">{u.lastLogin}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <button className="text-xs text-accent-500 hover:text-accent-600 font-600">Edit</button>
-                          <span className="text-slate-200">|</span>
-                          <button className="text-xs text-risk-high hover:text-red-700 font-600">Deactivate</button>
-                        </div>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        No users found matching your search.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-navy-900">{user.name}</div>
+                          <div className="text-xs text-slate-400">{user.email}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700">
+                          <span className="inline-block bg-slate-100 text-slate-700 text-xs font-medium px-2 py-0.5 rounded">
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 text-xs">{user.department}</td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              user.status === "Active"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-slate-100 text-slate-500 border border-slate-200"
+                            }`}
+                          >
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => toggleStatus(user.id)}
+                            className={`text-xs font-semibold px-2.5 py-1 rounded transition-colors ${
+                              user.status === "Active"
+                                ? "text-red-600 hover:bg-red-50"
+                                : "text-emerald-600 hover:bg-emerald-50"
+                            }`}
+                          >
+                            {user.status === "Active" ? "Deactivate" : "Activate"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -138,159 +232,159 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Departments tab */}
-      {tab === "departments" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-600 text-navy-900">Department Management</h2>
-            <button className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg font-600 hover:bg-navy-700 transition-colors">
-              + Add Department
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {departments.map(d => (
-              <div key={d.name} className="bg-white rounded-xl border border-slate-200 p-5 card-hover">
-                <h3 className="font-display font-700 text-navy-900 text-sm mb-3">{d.name}</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <div className="font-mono font-700 text-base text-slate-800">{d.projects}</div>
-                    <div className="text-[10px] text-slate-400">Projects</div>
-                  </div>
-                  <div>
-                    <div className="font-mono font-700 text-base text-navy-700">{d.budget}</div>
-                    <div className="text-[10px] text-slate-400">Budget</div>
-                  </div>
-                  <div>
-                    <div className="font-mono font-700 text-base text-slate-600">{d.officers}</div>
-                    <div className="text-[10px] text-slate-400">Officers</div>
-                  </div>
+      {/* TAB 2: DEPARTMENTS */}
+      {activeTab === "departments" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {DEPARTMENTS.map((dept) => (
+            <div key={dept.name} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-navy-900 text-base">{dept.name}</h3>
+              <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-slate-100 text-center">
+                <div>
+                  <div className="text-lg font-bold text-navy-800">{dept.projects}</div>
+                  <div className="text-xs text-slate-400">Projects</div>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <button className="flex-1 text-xs border border-slate-200 text-slate-500 py-1.5 rounded-lg hover:bg-slate-50 transition-colors font-500">Edit</button>
-                  <button className="flex-1 text-xs bg-accent-100 text-accent-600 py-1.5 rounded-lg hover:bg-accent-100 transition-colors font-600">View Projects</button>
+                <div>
+                  <div className="text-lg font-bold text-navy-800">{dept.budget}</div>
+                  <div className="text-xs text-slate-400">Total Budget</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-navy-800">{dept.officers}</div>
+                  <div className="text-xs text-slate-400">Officers</div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Contractors tab */}
-      {tab === "contractors" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-600 text-navy-900">Contractor Registry</h2>
-            <button className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg font-600 hover:bg-navy-700 transition-colors">
-              + Register Contractor
+      {/* TAB 3: SETTINGS */}
+      {activeTab === "settings" && (
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 max-w-2xl">
+          <div>
+            <h3 className="font-bold text-navy-900 text-base">Notification Settings</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Control automated alerts for delayed and high-risk projects.</p>
+            <div className="mt-4 space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-navy-700" />
+                <span className="text-sm text-slate-700">Email alerts for High Risk project milestone delays</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-navy-700" />
+                <span className="text-sm text-slate-700">Notify field officers 48 hours before scheduled inspection</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 rounded text-navy-700" />
+                <span className="text-sm text-slate-700">Weekly progress digest to Department Heads</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100">
+            <h3 className="font-bold text-navy-900 text-base">Risk Threshold</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Projects above this delay percentage are automatically marked as High Risk.</p>
+            <div className="mt-3 flex items-center gap-3">
+              <input
+                type="number"
+                defaultValue={20}
+                className="w-24 px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600"
+              />
+              <span className="text-sm text-slate-500">% progress delay</span>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => alert("Settings saved successfully!")}
+              className="bg-navy-800 hover:bg-navy-900 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              Save Settings
             </button>
           </div>
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50">
-                  {["Contractor", "Projects", "Delayed", "Risk Score", "Actions"].map(h => (
-                    <th key={h} className="text-left px-6 py-3 text-xs font-600 text-slate-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {contractors.map(c => (
-                  <tr key={c.name} className="table-row-hover">
-                    <td className="px-6 py-4 font-500 text-slate-700 text-sm">{c.name}</td>
-                    <td className="px-6 py-4 font-mono text-sm text-slate-600">{c.projects}</td>
-                    <td className="px-6 py-4 font-mono text-sm text-risk-medium font-600">{c.delayed}</td>
-                    <td className="px-6 py-4">
-                      <span className={`font-mono font-700 text-sm ${c.risk >= 70 ? "text-risk-high" : c.risk >= 50 ? "text-risk-medium" : "text-risk-low"}`}>
-                        {c.risk}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button className="text-xs text-accent-500 hover:text-accent-600 font-600">Profile</button>
-                        <span className="text-slate-200">|</span>
-                        <button className="text-xs text-slate-500 hover:text-slate-700 font-600">Edit</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
-      {/* Projects tab */}
-      {tab === "projects" && (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 flex flex-col items-center justify-center text-center min-h-64">
-          <div className="text-4xl mb-4">📁</div>
-          <h3 className="font-display font-700 text-navy-900 text-lg mb-2">Project Registry</h3>
-          <p className="text-slate-400 text-sm max-w-md">
-            Manage all project records, assignments, and statuses. This module connects to the Project Map and Risk Analysis screens.
-          </p>
-          <button className="mt-5 text-sm bg-navy-800 text-white px-5 py-2.5 rounded-xl font-600 hover:bg-navy-700 transition-colors">
-            Import from Data Source
-          </button>
-        </div>
-      )}
+      {/* ADD USER MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="font-bold text-navy-900 text-base">Add New User</h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+              >
+                &times;
+              </button>
+            </div>
 
-      {/* Settings tab */}
-      {tab === "settings" && (
-        <div className="space-y-6">
-          <h2 className="font-display font-600 text-navy-900">System Settings</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              {
-                title: "Risk Score Thresholds",
-                desc: "Configure the thresholds used to classify projects as high, medium, or low risk.",
-                fields: [
-                  { label: "High Risk threshold", value: "70" },
-                  { label: "Medium Risk threshold", value: "50" },
-                ],
-              },
-              {
-                title: "Alert Configuration",
-                desc: "Set up automated alerts for when projects cross risk thresholds.",
-                fields: [
-                  { label: "Alert email recipients", value: "officers@gov.in" },
-                  { label: "Alert frequency", value: "Daily digest" },
-                ],
-              },
-              {
-                title: "Data Retention",
-                desc: "Configure how long evidence and inspection records are retained.",
-                fields: [
-                  { label: "Evidence retention (years)", value: "7" },
-                  { label: "Inspection records (years)", value: "10" },
-                ],
-              },
-              {
-                title: "Audit & Compliance",
-                desc: "All actions are logged. Configure audit log retention and access.",
-                fields: [
-                  { label: "Audit log retention", value: "10 years" },
-                  { label: "Access review frequency", value: "Quarterly" },
-                ],
-              },
-            ].map(s => (
-              <div key={s.title} className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="font-display font-700 text-navy-900 text-sm mb-1">{s.title}</h3>
-                <p className="text-xs text-slate-400 mb-4">{s.desc}</p>
-                <div className="space-y-3">
-                  {s.fields.map(f => (
-                    <div key={f.label}>
-                      <label className="text-xs font-500 text-slate-500 block mb-1">{f.label}</label>
-                      <input
-                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100 transition-all"
-                        defaultValue={f.value}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <button className="mt-4 text-xs bg-navy-800 text-white px-3 py-1.5 rounded-lg font-600 hover:bg-navy-700 transition-colors">
-                  Save Changes
+            <form onSubmit={handleAddUser} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Kumar"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. ramesh@gov.in"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Role</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600 bg-white"
+                >
+                  <option value="Government Officer">Government Officer</option>
+                  <option value="Field Inspector">Field Inspector</option>
+                  <option value="Administrator">Administrator</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Department</label>
+                <select
+                  value={newDept}
+                  onChange={(e) => setNewDept(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-navy-600 bg-white"
+                >
+                  <option value="Public Works (PWD)">Public Works (PWD)</option>
+                  <option value="Rural Development">Rural Development</option>
+                  <option value="NHAI Highways">NHAI Highways</option>
+                  <option value="Finance & Accounts">Finance & Accounts</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-sm bg-navy-800 hover:bg-navy-900 text-white rounded-lg font-semibold"
+                >
+                  Save User
                 </button>
               </div>
-            ))}
+            </form>
           </div>
         </div>
       )}

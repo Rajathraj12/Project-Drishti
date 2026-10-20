@@ -1038,10 +1038,10 @@ export default function ProjectDetails() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Implementing Agency</label>
+                  <label className="block font-bold text-slate-700 mb-1">Executing Department / Contractor</label>
                   <input
                     type="text"
-                    placeholder="Agency name"
+                    placeholder="e.g. NHAI, PWD, L&T"
                     value={actionAgency}
                     onChange={e => setActionAgency(e.target.value)}
                     className="w-full border border-slate-200 rounded p-2 text-xs"

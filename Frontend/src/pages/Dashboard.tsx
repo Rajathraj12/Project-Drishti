@@ -791,7 +791,7 @@ export default function Dashboard() {
                     { label: "View Project Map", path: "/map", icon: "🗺️" },
                     { label: "Pending Inspections", path: "/inspections", icon: "📋" },
                     { label: "Recent Evidence", path: "/evidence", icon: "📸" },
-                    { label: "Citizen Reports", path: "/report", icon: "🚩" },
+                    { label: "Contractor Directory", path: "/contractors", icon: "🏗️" },
                   ].filter((a) => canAccessPath(user?.role, a.path)).map((a, i) => (
                     <button
                       key={a.label}
