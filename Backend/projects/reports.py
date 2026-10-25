@@ -74,31 +74,6 @@ def get_scoped_reporting_dataset(user, query_params=None):
         except Exception:
             docs = []
 
-    # Fallback to SQLite if Mongo is unavailable or returns 0 in test mode
-    if not docs:
-        qs = filter_project_queryset(Project.objects.exclude(data_source_type='SYNTHETIC_DEMO'), user)
-        for p in qs:
-            if getattr(p, 'data_source_type', None) == 'SYNTHETIC_DEMO':
-                continue
-            docs.append({
-                'project_id': p.project_id,
-                'project_name': p.project_name,
-                'state': p.state,
-                'district': p.district or '',
-                'sector': getattr(p, 'department', '') or getattr(p, 'sector', ''),
-                'department': getattr(p, 'department', ''),
-                'original_cost_cr': float(p.original_cost) / 10000000.0 if p.original_cost else 0.0,
-                'revised_cost_cr': float(p.revised_cost) / 10000000.0 if p.revised_cost else 0.0,
-                'expenditure_cr': float(p.expenditure) / 10000000.0 if p.expenditure else 0.0,
-                'reported_progress_pct': float(p.reported_progress) if p.reported_progress is not None else 0.0,
-                'data_source_type': getattr(p, 'data_source_type', 'OFFICIAL'),
-                'source_name': getattr(p, 'source_name', 'MoSPI PAIMANA'),
-                'source_reference': getattr(p, 'source_project_id', p.project_id),
-                'source_url': 'https://cspm.gov.in',
-                'source_as_of_date': '2026-09-24',
-                'verification_status': getattr(p, 'verification_status', 'NOT_REVIEWED') or 'NOT_REVIEWED',
-                'is_public': getattr(p, 'is_public', False),
-            })
 
     # Fetch latest assessments keyed by project_id to prevent duplicates
     project_ids = [d.get('project_id') for d in docs if d.get('project_id')]
@@ -151,10 +126,6 @@ def get_scoped_reporting_dataset(user, query_params=None):
                 continue
             if not user_can_access_project(user, p_rec, for_corrective_action=True):
                 continue
-
-            if role == Role.IMPLEMENTING_AGENCY:
-                if a_doc.get('assigned_to') != user.username and a_doc.get('assigned_agency') != getattr(user, 'department', None):
-                    continue
 
             annotated_action = compute_action_metadata(a_doc)
             annotated_action['project_name'] = p_rec.get('project_name', '')
@@ -437,15 +408,14 @@ class ReportsListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not (has_capability(request.user, 'view_internal_reports') or has_capability(request.user, 'view_public_reports')):
+            return Response({'error': 'Forbidden: Access to reports is restricted to authorized personnel.'}, status=status.HTTP_403_FORBIDDEN)
+
         report_type = request.query_params.get('report_type', 'risk_assessments')
         dataset = get_scoped_reporting_dataset(request.user, request.query_params)
         projects = dataset['projects']
         actions = dataset['actions']
         role = dataset['role']
-
-        # Enforce Citizen boundaries: Citizens only see public_oversight
-        if role == Role.CITIZEN and report_type != 'public_oversight':
-            report_type = 'public_oversight'
 
         results = []
 
@@ -591,13 +561,12 @@ class ReportsExportView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not (has_capability(request.user, 'view_internal_reports') or has_capability(request.user, 'view_public_reports')):
+            return Response({'error': 'Forbidden: Access to report export is restricted to authorized personnel.'}, status=status.HTTP_403_FORBIDDEN)
+
         report_type = request.query_params.get('report_type', 'risk_assessments')
         dataset = get_scoped_reporting_dataset(request.user, request.query_params)
         role = dataset['role']
-
-        # Enforce Citizen boundaries
-        if role == Role.CITIZEN and report_type != 'public_oversight':
-            report_type = 'public_oversight'
 
         # Fetch records by reusing ReportsListView logic
         list_view = ReportsListView()

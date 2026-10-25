@@ -92,16 +92,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return obj
 
     def list(self, request, *args, **kwargs):
-        """Fetch directly from MongoDB Atlas instead of SQLite"""
+        """Fetch exclusively from MongoDB Atlas."""
         import os
         from pymongo import MongoClient
         from rest_framework.response import Response
         
-        from django.conf import settings
         mongo_uri = os.getenv('MONGO_URI')
-        if not mongo_uri or getattr(settings, 'TESTING', False):
-            # Fallback to SQLite if Mongo URI is not set or running tests
-            return super().list(request, *args, **kwargs)
+        if not mongo_uri:
+            return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         try:
             client = MongoClient(mongo_uri)
@@ -160,6 +158,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     "state": doc.get("state"),
                     "district": doc.get("district", ""),
                     "sector": doc.get("sector"),
+                    "latitude": doc.get("latitude"),
+                    "longitude": doc.get("longitude"),
+                    "location_from": doc.get("location_from"),
+                    "location_to": doc.get("location_to"),
                     "original_cost": doc.get("original_cost_cr"),
                     "original_cost_cr": doc.get("original_cost_cr"),
                     "revised_cost": doc.get("revised_cost_cr"),
@@ -187,9 +189,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "results": results
             })
         except Exception as e:
-            # Fallback
-            print(f"MongoDB Error: {e}")
-            return super().list(request, *args, **kwargs)
+            return Response({"error": f"MongoDB Atlas Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_create(self, serializer):
         # Audit event will be handled by signals or overridden methods later
@@ -213,34 +213,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except Exception:
             return None
 
-    def _sqlite_project(self, project_id):
-        qs = Project.objects.exclude(data_source_type='SYNTHETIC_DEMO').filter(project_id=project_id)
-        if str(project_id).isdigit():
-            from django.db.models import Q
-            qs = Project.objects.exclude(data_source_type='SYNTHETIC_DEMO').filter(Q(project_id=project_id) | Q(pk=project_id))
-        return qs.first()
-
     def _load_project_record(self, project_id):
-        doc = self.get_mongo_project(project_id)
-        if doc:
-            return doc
-        try:
-            obj = self._sqlite_project(project_id)
-            if not obj:
-                return None
-            return {
-                "project_id": obj.project_id,
-                "project_name": getattr(obj, 'project_name', ''),
-                "state": obj.state,
-                "district": obj.district or '',
-                "department": getattr(obj, 'department', ''),
-                "sector": getattr(obj, 'department', ''),
-                "verification_status": getattr(obj, 'verification_status', 'NOT_REVIEWED'),
-                "is_public": getattr(obj, 'is_public', True),
-                "data_source_type": getattr(obj, 'data_source_type', 'OFFICIAL'),
-            }
-        except Exception:
-            return None
+        return self.get_mongo_project(project_id)
 
     def _authorize_project(self, pk, capability=None):
         record = self._load_project_record(pk)
@@ -337,10 +311,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             }
             return Response(sanitize_project_payload(request.user, payload))
 
-        try:
-            return super().retrieve(request, *args, **kwargs)
-        except Exception:
-            raise NotFound()
+        raise NotFound()
 
     @action(detail=True, methods=['post'])
     def analyze(self, request, pk=None):

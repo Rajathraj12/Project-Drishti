@@ -161,7 +161,7 @@ class Phase7CorrectiveActionTests(TestCase):
             username='field_punjab', password='password123', role=Role.FIELD_OFFICER, state='Punjab'
         )
         self.contractor_agency = User.objects.create_user(
-            username='contractor_corp', password='password123', role=Role.IMPLEMENTING_AGENCY, department='InfraCorp'
+            username='contractor_corp', password='password123', role=Role.FIELD_OFFICER, department='InfraCorp'
         )
         self.citizen = User.objects.create_user(
             username='citizen_ram', password='password123', role=Role.CITIZEN

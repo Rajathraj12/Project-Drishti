@@ -5,7 +5,6 @@ class Role(models.TextChoices):
     ADMIN = 'ADMIN', 'Admin'
     GOVERNMENT_OFFICER = 'GOVERNMENT_OFFICER', 'Government Officer'
     FIELD_OFFICER = 'FIELD_OFFICER', 'Field Officer'
-    IMPLEMENTING_AGENCY = 'IMPLEMENTING_AGENCY', 'Implementing Agency'
     CITIZEN = 'CITIZEN', 'Citizen'
 
 class User(AbstractUser):

@@ -110,6 +110,142 @@ function AlertTriangleIcon({ size = 22 }: { size?: number }) {
   )
 }
 
+function LayoutGridIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+function LayersIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  )
+}
+
+function MapPinIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  )
+}
+
+function CameraIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  )
+}
+
+function FileTextIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
+  )
+}
+
+function ShieldAlertIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  )
+}
+
+const DASHBOARD_MENU_ITEMS = [
+  {
+    title: "Executive Overview",
+    desc: "State-wide KPI telemetry, expenditure velocity & anomaly counts",
+    path: "/dashboard",
+    badge: "Telemetry",
+    badgeBg: "rgba(37, 99, 235, 0.1)",
+    badgeColor: "#1d4ed8",
+    Icon: LayoutGridIcon,
+    iconBg: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+    iconColor: "#2563eb",
+  },
+  {
+    title: "Infrastructure Projects",
+    desc: "Portfolio registry of ongoing works, status & risk tiers",
+    path: "/projects",
+    badge: "Registry",
+    badgeBg: "rgba(245, 158, 11, 0.1)",
+    badgeColor: "#d97706",
+    Icon: LayersIcon,
+    iconBg: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+    iconColor: "#d97706",
+  },
+  {
+    title: "GIS Geo-Intelligence Map",
+    desc: "Interactive spatial map, cluster analytics & site locations",
+    path: "/map",
+    badge: "GIS Map",
+    badgeBg: "rgba(13, 148, 136, 0.1)",
+    badgeColor: "#0f766e",
+    Icon: MapPinIcon,
+    iconBg: "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)",
+    iconColor: "#0d9488",
+  },
+  {
+    title: "Physical Inspections",
+    desc: "Field officer verification logs, geotagged evidence & photo logs",
+    path: "/inspections",
+    badge: "Audits",
+    badgeBg: "rgba(99, 102, 241, 0.1)",
+    badgeColor: "#4f46e5",
+    Icon: CameraIcon,
+    iconBg: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
+    iconColor: "#4f46e5",
+  },
+  {
+    title: "Audit & Analytical Reports",
+    desc: "Exportable analytics, executive summaries & compliance dossiers",
+    path: "/reports",
+    badge: "Official",
+    badgeBg: "rgba(168, 85, 247, 0.1)",
+    badgeColor: "#7e22ce",
+    Icon: FileTextIcon,
+    iconBg: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+    iconColor: "#9333ea",
+  },
+  {
+    title: "Corrective Actions",
+    desc: "Closed-loop remediation tracking, officer sign-offs & audit trails",
+    path: "/actions",
+    badge: "Compliance",
+    badgeBg: "rgba(239, 68, 68, 0.1)",
+    badgeColor: "#b91c1c",
+    Icon: ShieldAlertIcon,
+    iconBg: "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
+    iconColor: "#dc2626",
+  },
+]
+
 // ─── colour tokens (matching the design system) ───────────────────────────────
 
 const C = {
@@ -318,7 +454,39 @@ export default function Landing() {
 
   // State
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [mobileDashboardOpen, setMobileDashboardOpen] = useState(false)
+  const [dashboardDropdownOpen, setDashboardDropdownOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const dropdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dashboardDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dashboard dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dashboardDropdownRef.current && !dashboardDropdownRef.current.contains(e.target as Node)) {
+        setDashboardDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      if (dropdownTimeoutRef.current) clearTimeout(dropdownTimeoutRef.current)
+    }
+  }, [])
+
+  const handleMouseEnterDashboard = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current)
+      dropdownTimeoutRef.current = null
+    }
+    setDashboardDropdownOpen(true)
+  }
+
+  const handleMouseLeaveDashboard = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setDashboardDropdownOpen(false)
+    }, 180)
+  }
 
   // Hero carousel state
   const [heroSlide, setHeroSlide] = useState(0)
@@ -435,28 +603,30 @@ export default function Landing() {
       position: "sticky" as const,
       top: 0,
       zIndex: 200,
-      background: scrolled ? "rgba(255,255,255,0.97)" : C.white,
-      borderBottom: `1px solid ${scrolled ? C.border : "transparent"}`,
-      backdropFilter: scrolled ? "blur(12px)" : "none",
-      WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
-      transition: "background 0.3s, border-color 0.3s, box-shadow 0.3s",
-      boxShadow: scrolled ? "0 1px 16px rgba(11,31,75,0.08)" : "none",
+      background: scrolled ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.97)",
+      borderBottom: `1px solid ${scrolled ? "rgba(220, 232, 245, 0.9)" : "rgba(226, 232, 240, 0.75)"}`,
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
+      transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+      boxShadow: scrolled
+        ? "0 10px 30px -10px rgba(11, 31, 75, 0.09), 0 2px 6px -1px rgba(11, 31, 75, 0.04)"
+        : "0 2px 12px -2px rgba(11, 31, 75, 0.03)",
     } as React.CSSProperties,
 
     headerInner: {
-      maxWidth: 1200,
+      maxWidth: 1280,
       margin: "0 auto",
-      padding: "0 24px",
-      height: 64,
+      padding: "0 28px",
+      height: 70,
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 16,
+      gap: 20,
     } as React.CSSProperties,
 
     accentRule: {
-      height: 3,
-      background: `linear-gradient(90deg, ${C.amber} 0%, ${C.navy600} 60%, transparent 100%)`,
+      height: 2.5,
+      background: "linear-gradient(90deg, #F59E0B 0%, #2563EB 50%, #0D9488 100%)",
     } as React.CSSProperties,
 
     // HERO
@@ -568,96 +738,531 @@ export default function Landing() {
 
       {/* ============================================================ HEADER */}
       <header style={S.header} role="banner">
+        {/* Top Civic Gradient Ribbon */}
+        <div style={S.accentRule} aria-hidden />
+
         <div style={S.headerInner}>
 
           {/* Brand */}
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: 0, flexShrink: 0 }}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 12, padding: 0, flexShrink: 0,
+              textDecoration: "none",
+            }}
             aria-label="Project Drishti — home"
           >
-            <img src="/logo.png" alt="Project Drishti logo" style={{ height: 40, objectFit: "contain" }} />
-            <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.1rem", color: C.navy900, letterSpacing: "-0.02em" }}>
-              Drishti
-            </span>
+            <div style={{
+              position: "relative",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s ease",
+            }}>
+              <img
+                src="/logo.png"
+                alt="Project Drishti logo"
+                style={{ height: 40, width: 40, objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(11,31,75,0.14))" }}
+              />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.25rem",
+                  color: C.navy900, letterSpacing: "-0.03em", lineHeight: 1.1,
+                }}>
+                  Drishti
+                </span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  background: "rgba(34, 197, 94, 0.09)", border: "1px solid rgba(34, 197, 94, 0.25)",
+                  borderRadius: 99, padding: "2px 7px",
+                  fontSize: "0.62rem", fontWeight: 700, color: "#15803d", letterSpacing: "0.04em",
+                }}>
+                  <span className="live-dot" style={{ width: 6, height: 6 }} />
+                  LIVE
+                </span>
+              </div>
+              <span style={{
+                fontSize: "0.6rem", fontWeight: 700, color: C.slate,
+                letterSpacing: "0.07em", textTransform: "uppercase", marginTop: 2,
+              }}>
+                Civic Infrastructure Intelligence
+              </span>
+            </div>
           </button>
 
-          {/* Desktop nav */}
-          <nav aria-label="Primary navigation" style={{ display: "flex", alignItems: "center", gap: 0, flex: 1, justifyContent: "center" }}>
-            {navItems.map((item, i) => (
+          {/* Central Nav Pill Dock */}
+          <nav
+            aria-label="Primary navigation"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: 1,
+            }}
+          >
+            <div
+              style={{
+                background: "rgba(241, 245, 249, 0.8)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                border: "1px solid rgba(226, 232, 240, 0.9)",
+                borderRadius: 9999,
+                padding: "4px 6px",
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                boxShadow: "inset 0 1px 2px rgba(15, 23, 42, 0.04)",
+                position: "relative",
+              }}
+            >
+              {/* Home */}
               <button
-                key={item.label}
-                onClick={item.action}
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                 style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  padding: "10px 16px",
-                  fontSize: "0.84rem", fontWeight: 500,
-                  color: i === 0 ? C.amber : C.slate,
+                  background: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "7px 18px",
+                  borderRadius: 9999,
+                  fontSize: "0.84rem",
+                  fontWeight: 700,
+                  color: C.navy900,
                   fontFamily: "var(--font-sans)",
-                  letterSpacing: "0.01em",
-                  display: "flex", alignItems: "center", gap: 4,
-                  borderBottom: i === 0 ? `2px solid ${C.amber}` : "2px solid transparent",
-                  transition: "color 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 8px rgba(11, 31, 75, 0.08), 0 1px 2px rgba(11, 31, 75, 0.04)",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
-                onMouseEnter={e => { if (i !== 0) (e.currentTarget as HTMLElement).style.color = C.navy700 }}
-                onMouseLeave={e => { if (i !== 0) (e.currentTarget as HTMLElement).style.color = C.slate }}
               >
-                {item.label}
-                {(item.label === "Publications" || item.label === "Dashboard") && <ChevronDown size={12} />}
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.amber, display: "inline-block" }} />
+                Home
               </button>
-            ))}
+
+              {/* Publications (NO ARROW) */}
+              <button
+                onClick={() => {
+                  const aboutEl = document.getElementById("about")
+                  if (aboutEl) aboutEl.scrollIntoView({ behavior: "smooth" })
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "7px 18px",
+                  borderRadius: 9999,
+                  fontSize: "0.84rem",
+                  fontWeight: 600,
+                  color: C.slate,
+                  fontFamily: "var(--font-sans)",
+                  display: "flex",
+                  alignItems: "center",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = "rgba(255, 255, 255, 0.85)"
+                  el.style.color = C.navy900
+                  el.style.boxShadow = "0 1px 4px rgba(11, 31, 75, 0.04)"
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = "transparent"
+                  el.style.color = C.slate
+                  el.style.boxShadow = "none"
+                }}
+              >
+                Publications
+              </button>
+
+              {/* Dashboard with animated chevron & mega dropdown ("arrow items below dashboard") */}
+              <div
+                ref={dashboardDropdownRef}
+                style={{ position: "relative" }}
+                onMouseEnter={handleMouseEnterDashboard}
+                onMouseLeave={handleMouseLeaveDashboard}
+              >
+                <button
+                  onClick={() => setDashboardDropdownOpen(v => !v)}
+                  style={{
+                    background: dashboardDropdownOpen ? "rgba(255, 255, 255, 0.95)" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "7px 16px",
+                    borderRadius: 9999,
+                    fontSize: "0.84rem",
+                    fontWeight: 600,
+                    color: dashboardDropdownOpen ? C.navy900 : C.slate,
+                    fontFamily: "var(--font-sans)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    boxShadow: dashboardDropdownOpen ? "0 2px 8px rgba(11, 31, 75, 0.08)" : "none",
+                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                  onMouseEnter={e => {
+                    if (!dashboardDropdownOpen) {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.background = "rgba(255, 255, 255, 0.85)"
+                      el.style.color = C.navy900
+                      el.style.boxShadow = "0 1px 4px rgba(11, 31, 75, 0.04)"
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!dashboardDropdownOpen) {
+                      const el = e.currentTarget as HTMLElement
+                      el.style.background = "transparent"
+                      el.style.color = C.slate
+                      el.style.boxShadow = "none"
+                    }
+                  }}
+                  aria-expanded={dashboardDropdownOpen}
+                  aria-haspopup="true"
+                >
+                  <span>Dashboard</span>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      transform: dashboardDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                      color: dashboardDropdownOpen ? C.navy800 : C.slate,
+                    }}
+                  >
+                    <ChevronDown size={12} />
+                  </span>
+                </button>
+
+                {/* DASHBOARD DROPDOWN MEGA-MENU ("arrow items below dashboard") */}
+                {dashboardDropdownOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Dashboard Modules"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 10px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 660,
+                      maxWidth: "calc(100vw - 32px)",
+                      boxSizing: "border-box",
+                      background: "#ffffff",
+                      border: "1px solid rgba(219, 234, 254, 0.95)",
+                      borderRadius: 18,
+                      boxShadow: "0 24px 50px -12px rgba(11, 31, 75, 0.22), 0 0 0 1px rgba(11, 31, 75, 0.05)",
+                      padding: "16px 16px 12px",
+                      zIndex: 300,
+                      animation: "fadeInDropdown 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
+                      overflow: "hidden",
+                    }}
+                    onMouseEnter={handleMouseEnterDashboard}
+                    onMouseLeave={handleMouseLeaveDashboard}
+                  >
+                    {/* Top mini header */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0 6px 12px",
+                      borderBottom: "1px solid rgba(226, 232, 240, 0.75)",
+                      marginBottom: 10,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          fontSize: "0.66rem",
+                          fontWeight: 800,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          color: C.navy700,
+                        }}>
+                          Institutional Dashboard Suite
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: "0.64rem",
+                        fontWeight: 700,
+                        color: "#2563eb",
+                        background: "rgba(37, 99, 235, 0.08)",
+                        padding: "2px 8px",
+                        borderRadius: 99,
+                        letterSpacing: "0.02em",
+                      }}>
+                        6 Integrated Modules
+                      </span>
+                    </div>
+
+                    {/* 2-column Grid of modules */}
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      gap: "8px 12px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}>
+                      {DASHBOARD_MENU_ITEMS.map((item) => {
+                        const ItemIcon = item.Icon
+                        return (
+                          <div
+                            key={item.title}
+                            role="menuitem"
+                            onClick={() => {
+                              navigate(item.path)
+                              setDashboardDropdownOpen(false)
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              gap: 12,
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              cursor: "pointer",
+                              border: "1px solid transparent",
+                              background: "transparent",
+                              boxSizing: "border-box",
+                              minWidth: 0,
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                            }}
+                            onMouseEnter={e => {
+                              const el = e.currentTarget as HTMLElement
+                              el.style.background = "rgba(241, 245, 249, 0.85)"
+                              el.style.borderColor = "rgba(203, 213, 225, 0.7)"
+                              el.style.transform = "translateY(-1px)"
+                            }}
+                            onMouseLeave={e => {
+                              const el = e.currentTarget as HTMLElement
+                              el.style.background = "transparent"
+                              el.style.borderColor = "transparent"
+                              el.style.transform = "translateY(0)"
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                background: item.iconBg,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+                                marginTop: 1,
+                              }}
+                            >
+                              <ItemIcon size={18} color={item.iconColor} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2, minWidth: 0 }}>
+                                <span style={{
+                                  fontSize: "0.84rem",
+                                  fontWeight: 700,
+                                  color: C.navy900,
+                                  lineHeight: 1.2,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  minWidth: 0,
+                                }}>
+                                  {item.title}
+                                </span>
+                                <span style={{
+                                  fontSize: "0.58rem",
+                                  fontWeight: 700,
+                                  padding: "2px 7px",
+                                  borderRadius: 99,
+                                  background: item.badgeBg,
+                                  color: item.badgeColor,
+                                  flexShrink: 0,
+                                  letterSpacing: "0.02em",
+                                  whiteSpace: "nowrap",
+                                }}>
+                                  {item.badge}
+                                </span>
+                              </div>
+                              <p style={{
+                                margin: 0,
+                                fontSize: "0.72rem",
+                                color: C.slate,
+                                lineHeight: 1.35,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}>
+                                {item.desc}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Dropdown Footer Strip */}
+                    <div
+                      onClick={() => {
+                        navigate("/dashboard")
+                        setDashboardDropdownOpen(false)
+                      }}
+                      style={{
+                        marginTop: 10,
+                        padding: "10px 14px",
+                        borderRadius: 10,
+                        background: "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(11, 31, 75, 0.2)",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.filter = "brightness(1.1)"
+                        ;(e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.filter = "none"
+                        ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#ffffff" }}>
+                          Launch Complete Oversight Workspace
+                        </span>
+                        <span style={{
+                          fontSize: "0.64rem",
+                          color: "#93c5fd",
+                          fontWeight: 600,
+                        }}>
+                          · {totalProjects} Projects Active
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, color: C.amber, fontWeight: 700, fontSize: "0.75rem" }}>
+                        <span>Enter</span>
+                        <ArrowRight size={13} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* About */}
+              <button
+                onClick={() => {
+                  const aboutEl = document.getElementById("about")
+                  if (aboutEl) aboutEl.scrollIntoView({ behavior: "smooth" })
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "7px 18px",
+                  borderRadius: 9999,
+                  fontSize: "0.84rem",
+                  fontWeight: 600,
+                  color: C.slate,
+                  fontFamily: "var(--font-sans)",
+                  display: "flex",
+                  alignItems: "center",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = "rgba(255, 255, 255, 0.85)"
+                  el.style.color = C.navy900
+                  el.style.boxShadow = "0 1px 4px rgba(11, 31, 75, 0.04)"
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.background = "transparent"
+                  el.style.color = C.slate
+                  el.style.boxShadow = "none"
+                }}
+              >
+                About
+              </button>
+            </div>
           </nav>
 
           {/* Right actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {isAuthenticated && canViewReports && (
-              <button
-                id="landing-reports-btn"
-                onClick={() => navigate("/reports")}
-                style={{
-                  background: "none", border: `1.5px solid ${C.border}`,
-                  color: C.navy700, padding: "8px 16px", borderRadius: 8,
-                  fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
-                  fontFamily: "var(--font-sans)",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={e => {
-                  const el = e.currentTarget as HTMLElement
-                  el.style.borderColor = C.navy600
-                  el.style.background = C.navy50
-                }}
-                onMouseLeave={e => {
-                  const el = e.currentTarget as HTMLElement
-                  el.style.borderColor = C.border
-                  el.style.background = "none"
-                }}
-              >
-                Reports
-              </button>
-            )}
+            {/* Reports access button */}
+            <button
+              id="landing-reports-btn"
+              onClick={() => navigate(isAuthenticated ? "/reports" : "/dashboard")}
+              style={{
+                background: "rgba(255, 255, 255, 0.85)",
+                border: "1.5px solid rgba(203, 213, 225, 0.85)",
+                color: C.navy700,
+                padding: "8px 16px",
+                borderRadius: 10,
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "var(--font-sans)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                boxShadow: "0 1px 3px rgba(11, 31, 75, 0.04)",
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.borderColor = "#93c5fd"
+                el.style.background = "#eff6ff"
+                el.style.color = "#1d4ed8"
+                el.style.transform = "translateY(-1px)"
+                el.style.boxShadow = "0 3px 10px rgba(37, 99, 235, 0.12)"
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.borderColor = "rgba(203, 213, 225, 0.85)"
+                el.style.background = "rgba(255, 255, 255, 0.85)"
+                el.style.color = C.navy700
+                el.style.transform = "translateY(0)"
+                el.style.boxShadow = "0 1px 3px rgba(11, 31, 75, 0.04)"
+              }}
+            >
+              <FileTextIcon size={14} color="currentColor" />
+              <span>Reports</span>
+            </button>
 
+            {/* Primary Action Button */}
             <button
               id="landing-dashboard-btn"
               onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
               style={{
-                background: C.navy700, color: C.white,
-                border: "none", padding: "9px 20px", borderRadius: 8,
-                fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+                background: "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)",
+                color: C.white,
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                padding: "9px 20px",
+                borderRadius: 10,
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                cursor: "pointer",
                 fontFamily: "var(--font-sans)",
-                display: "flex", alignItems: "center", gap: 6,
-                transition: "background 0.2s, transform 0.15s",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 letterSpacing: "0.01em",
+                boxShadow: "0 4px 14px rgba(11, 31, 75, 0.22)",
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = C.navy800
-                ;(e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"
+                const el = e.currentTarget as HTMLElement
+                el.style.background = "linear-gradient(135deg, #071428 0%, #172554 100%)"
+                el.style.transform = "translateY(-1.5px)"
+                el.style.boxShadow = "0 6px 20px rgba(11, 31, 75, 0.32)"
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = C.navy700
-                ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+                const el = e.currentTarget as HTMLElement
+                el.style.background = "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)"
+                el.style.transform = "translateY(0)"
+                el.style.boxShadow = "0 4px 14px rgba(11, 31, 75, 0.22)"
               }}
             >
-              {isAuthenticated && canWriteProject ? "Add / Update Project" : "Open Dashboard"}
+              <span>{isAuthenticated && canWriteProject ? "Add / Update Project" : "Open Dashboard"}</span>
               <ArrowRight size={13} />
             </button>
 
@@ -668,9 +1273,13 @@ export default function Landing() {
               onClick={() => setMobileOpen(v => !v)}
               style={{
                 display: "none",
-                background: "none", border: `1px solid ${C.border}`,
-                borderRadius: 8, padding: 8, cursor: "pointer",
-                color: C.slate,
+                background: "rgba(241, 245, 249, 0.8)",
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                padding: 8,
+                cursor: "pointer",
+                color: C.navy900,
+                transition: "all 0.2s ease",
               }}
               className="landing-mobile-menu-btn"
             >
@@ -679,48 +1288,166 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Accent rule */}
-        <div style={S.accentRule} aria-hidden />
-
         {/* Mobile drawer */}
         {mobileOpen && (
           <nav
             aria-label="Mobile navigation"
             style={{
-              background: C.white, borderTop: `1px solid ${C.border}`,
-              padding: "12px 0", position: "absolute", top: "100%",
-              left: 0, right: 0,
-              boxShadow: "0 8px 24px rgba(11,31,75,0.12)",
+              background: "rgba(255, 255, 255, 0.98)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              borderTop: `1px solid ${C.border}`,
+              padding: "16px 20px 24px",
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              boxShadow: "0 16px 32px rgba(11, 31, 75, 0.15)",
+              maxHeight: "calc(100vh - 80px)",
+              overflowY: "auto",
             }}
           >
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => { item.action(); setMobileOpen(false) }}
-                style={{
-                  display: "block", width: "100%", background: "none",
-                  border: "none", textAlign: "left",
-                  padding: "12px 24px", fontSize: "0.9rem",
-                  color: C.navy700, cursor: "pointer",
-                  fontFamily: "var(--font-sans)", fontWeight: 500,
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
-            <div style={{ borderTop: `1px solid ${C.border}`, margin: "8px 0" }} />
+            {/* Home */}
             <button
-              onClick={() => { navigate(isAuthenticated ? "/dashboard" : "/login"); setMobileOpen(false) }}
+              onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); setMobileOpen(false) }}
               style={{
-                display: "block", width: "calc(100% - 48px)", margin: "4px 24px",
-                background: C.navy700, color: C.white, border: "none",
-                borderRadius: 8, padding: "11px 16px",
-                fontSize: "0.9rem", fontWeight: 600, cursor: "pointer",
-                fontFamily: "var(--font-sans)",
+                display: "block", width: "100%", background: "none", border: "none",
+                textAlign: "left", padding: "12px 14px", fontSize: "0.92rem",
+                color: C.navy900, cursor: "pointer", fontFamily: "var(--font-sans)",
+                fontWeight: 700, borderRadius: 8,
               }}
             >
-              Open Dashboard
+              Home
             </button>
+
+            {/* Publications (no arrow) */}
+            <button
+              onClick={() => {
+                document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })
+                setMobileOpen(false)
+              }}
+              style={{
+                display: "block", width: "100%", background: "none", border: "none",
+                textAlign: "left", padding: "12px 14px", fontSize: "0.92rem",
+                color: C.navy700, cursor: "pointer", fontFamily: "var(--font-sans)",
+                fontWeight: 600, borderRadius: 8,
+              }}
+            >
+              Publications
+            </button>
+
+            {/* Dashboard with expandable sub-items */}
+            <div>
+              <button
+                onClick={() => setMobileDashboardOpen(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", background: mobileDashboardOpen ? "rgba(241, 245, 249, 0.8)" : "none",
+                  border: "none", textAlign: "left", padding: "12px 14px",
+                  fontSize: "0.92rem", color: C.navy900, cursor: "pointer",
+                  fontFamily: "var(--font-sans)", fontWeight: 700, borderRadius: 8,
+                }}
+              >
+                <span>Dashboard Modules</span>
+                <span style={{
+                  transform: mobileDashboardOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s ease",
+                }}>
+                  <ChevronDown size={14} />
+                </span>
+              </button>
+
+              {mobileDashboardOpen && (
+                <div style={{
+                  padding: "6px 0 6px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  borderLeft: "2px solid #3b82f6",
+                  marginLeft: 14,
+                  marginTop: 4,
+                  marginBottom: 8,
+                }}>
+                  {DASHBOARD_MENU_ITEMS.map((item) => {
+                    const ItemIcon = item.Icon
+                    return (
+                      <button
+                        key={item.title}
+                        onClick={() => { navigate(item.path); setMobileOpen(false) }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          width: "100%", background: "none", border: "none",
+                          textAlign: "left", padding: "8px 10px", fontSize: "0.85rem",
+                          color: C.navy800, cursor: "pointer", fontFamily: "var(--font-sans)",
+                          fontWeight: 600, borderRadius: 6,
+                        }}
+                      >
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 6, background: item.iconBg,
+                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>
+                          <ItemIcon size={14} color={item.iconColor} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.82rem" }}>{item.title}</div>
+                          <div style={{ fontSize: "0.68rem", color: C.slate }}>{item.badge}</div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* About */}
+            <button
+              onClick={() => {
+                document.getElementById("about")?.scrollIntoView({ behavior: "smooth" })
+                setMobileOpen(false)
+              }}
+              style={{
+                display: "block", width: "100%", background: "none", border: "none",
+                textAlign: "left", padding: "12px 14px", fontSize: "0.92rem",
+                color: C.navy700, cursor: "pointer", fontFamily: "var(--font-sans)",
+                fontWeight: 600, borderRadius: 8,
+              }}
+            >
+              About
+            </button>
+
+            <div style={{ borderTop: `1px solid ${C.border}`, margin: "14px 0" }} />
+
+            {/* Mobile CTA */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={() => { navigate("/reports"); setMobileOpen(false) }}
+                style={{
+                  width: "100%", background: "#eff6ff", color: "#1d4ed8",
+                  border: "1px solid #bfdbfe", borderRadius: 10, padding: "11px 16px",
+                  fontSize: "0.88rem", fontWeight: 700, cursor: "pointer",
+                  fontFamily: "var(--font-sans)", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 6,
+                }}
+              >
+                <FileTextIcon size={15} />
+                View Audit & Reports
+              </button>
+
+              <button
+                onClick={() => { navigate(isAuthenticated ? "/dashboard" : "/login"); setMobileOpen(false) }}
+                style={{
+                  width: "100%", background: "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)",
+                  color: C.white, border: "none", borderRadius: 10, padding: "12px 16px",
+                  fontSize: "0.88rem", fontWeight: 700, cursor: "pointer",
+                  fontFamily: "var(--font-sans)", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 8,
+                  boxShadow: "0 4px 14px rgba(11, 31, 75, 0.25)",
+                }}
+              >
+                {isAuthenticated && canWriteProject ? "Add / Update Project" : "Open Executive Dashboard"}
+                <ArrowRight size={14} />
+              </button>
+            </div>
           </nav>
         )}
       </header>

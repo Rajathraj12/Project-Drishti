@@ -384,6 +384,17 @@ body {
 /* ── Landing page responsive helpers ── */
 @keyframes gradient { 0%,100% { background-position:0% 50%; } 50% { background-position:100% 50%; } }
 
+@keyframes fadeInDropdown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 @media (max-width: 900px) {
   /* Editorial two-column → single column */
   #about > div > div { grid-template-columns: 1fr !important; gap: 40px !important; }

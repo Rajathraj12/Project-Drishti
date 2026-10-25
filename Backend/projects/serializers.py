@@ -60,7 +60,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_anomaly_status(self, obj):
         r = _calc_project_risk(obj)
-        return "ANOMALOUS" if (r.get('risk_level') == 'High' or r.get('risk_score', 0) >= 60) else "NORMAL"
+        score = r.get('risk_score') or 0
+        return "ANOMALOUS" if (r.get('risk_level') == 'High' or score >= 60) else "NORMAL"
 
     def get_anomaly_flag(self, obj):
         return self.get_anomaly_status(obj) == "ANOMALOUS"
@@ -129,7 +130,8 @@ class PublicProjectSerializer(serializers.ModelSerializer):
 
     def get_anomaly_status(self, obj):
         r = _calc_project_risk(obj)
-        return "ANOMALOUS" if (r.get('risk_level') == 'High' or r.get('risk_score', 0) >= 60) else "NORMAL"
+        score = r.get('risk_score') or 0
+        return "ANOMALOUS" if (r.get('risk_level') == 'High' or score >= 60) else "NORMAL"
 
     def get_anomaly_flag(self, obj):
         return self.get_anomaly_status(obj) == "ANOMALOUS"

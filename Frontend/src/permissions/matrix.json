@@ -23,7 +23,7 @@
     { "path": "/projects", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "CITIZEN"] },
     { "path": "/projects/:id", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "CITIZEN"] },
     { "path": "/map", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "CITIZEN"] },
-    { "path": "/reports", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "CITIZEN"] },
+    { "path": "/reports", "roles": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"] },
     { "path": "/report", "roles": ["CITIZEN"] },
     { "path": "/my-reports", "roles": ["CITIZEN"] }
   ],
@@ -47,6 +47,6 @@
     "view_contractors": ["ADMIN", "GOVERNMENT_OFFICER"],
     "view_inspections": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"],
     "view_internal_reports": ["ADMIN", "GOVERNMENT_OFFICER"],
-    "view_public_reports": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER", "CITIZEN"]
+    "view_public_reports": ["ADMIN", "GOVERNMENT_OFFICER", "FIELD_OFFICER"]
   }
 }

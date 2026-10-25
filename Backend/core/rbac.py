@@ -49,13 +49,13 @@ CAPABILITIES = {
     'bulk_analyze': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'view_verifications': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'submit_verification': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
-    'view_evidence': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER, Role.IMPLEMENTING_AGENCY},
-    'submit_evidence': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER, Role.IMPLEMENTING_AGENCY},
-    'view_corrective_actions': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER, Role.IMPLEMENTING_AGENCY},
+    'view_evidence': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
+    'submit_evidence': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
+    'view_corrective_actions': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'create_corrective_actions': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'close_corrective_actions': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'update_assigned_actions': {
-        Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER, Role.IMPLEMENTING_AGENCY
+        Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER
     },
     'manage_users': {Role.ADMIN},
     'write_project': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
@@ -64,7 +64,7 @@ CAPABILITIES = {
     'view_inspections': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'view_internal_reports': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'view_public_reports': {
-        Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER, Role.IMPLEMENTING_AGENCY, Role.CITIZEN
+        Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER
     },
 }
 
@@ -170,15 +170,6 @@ def user_can_access_project(user, project, *, for_corrective_action=False):
             return False
         return matches_jurisdiction(user, doc)
 
-    if role == Role.IMPLEMENTING_AGENCY:
-        if for_corrective_action:
-            return True
-        if assigned and project_id in assigned:
-            return True
-        if user.department and doc.get('department') and user.department == doc.get('department'):
-            return True
-        return False
-
     return False
 
 
@@ -192,8 +183,6 @@ def check_user_project_scope(user, project_doc, *, for_corrective_action=False):
         return False, "Forbidden: Citizens do not have access to this resource."
     if role in (Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER):
         return False, "Forbidden: Project outside user jurisdiction"
-    if role == Role.IMPLEMENTING_AGENCY:
-        return False, "Forbidden: Project is not assigned to this agency."
     return False, "Unauthorized role"
 
 
@@ -231,15 +220,6 @@ def filter_project_queryset(qs, user):
         if user.department:
             qs = qs.filter(department=user.department)
         return qs
-
-    if role == Role.IMPLEMENTING_AGENCY:
-        from django.db.models import Q
-        query = Q(pk__in=[])
-        if assigned:
-            query |= Q(project_id__in=assigned)
-        if user.department:
-            query |= Q(department=user.department)
-        return qs.filter(query)
 
     return qs.none()
 
@@ -284,18 +264,6 @@ def mongo_project_query(user):
         if user.department:
             query['$or'] = [{'department': user.department}, {'sector': user.department}]
         return query
-
-    if role == Role.IMPLEMENTING_AGENCY:
-        clauses = []
-        if assigned:
-            clauses.append({'project_id': {'$in': assigned}})
-        if user.department:
-            clauses.append({'department': user.department})
-            clauses.append({'sector': user.department})
-        if not clauses:
-            return {'_id': {'$exists': False}}
-        base_clause = {'$or': clauses} if len(clauses) > 1 else clauses[0]
-        return {'$and': [{'data_source_type': {'$ne': 'SYNTHETIC_DEMO'}}, base_clause]}
 
     return {'_id': {'$exists': False}}
 

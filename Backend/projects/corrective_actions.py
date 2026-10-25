@@ -134,22 +134,6 @@ def get_project_record(project_id):
                 return doc
         except Exception:
             pass
-            
-    # Fallback to SQLite Project model
-    from projects.models import Project
-    try:
-        p = Project.objects.exclude(data_source_type='SYNTHETIC_DEMO').filter(project_id=project_id).first()
-        if p:
-            return {
-                "project_id": p.project_id,
-                "project_name": p.project_name,
-                "state": p.state,
-                "district": p.district,
-                "department": p.department,
-                "verification_status": p.verification_status
-            }
-    except Exception:
-        pass
     return None
 
 def check_user_project_scope(user, project_doc):
@@ -274,11 +258,6 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
                 if not allowed:
                     continue
 
-            # Role-specific visibility
-            if role == Role.IMPLEMENTING_AGENCY:
-                if doc.get('assigned_to') != user.username and doc.get('assigned_agency') != getattr(user, 'department', None):
-                    continue
-
             # Apply query filters
             if project_id and doc.get('project_id') != project_id:
                 continue
@@ -318,10 +297,6 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
         if p_record:
             allowed, _reason = check_user_project_scope(user, p_record)
             if not allowed:
-                return Response({"error": "Corrective action not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        if role == Role.IMPLEMENTING_AGENCY:
-            if doc.get('assigned_to') != user.username and doc.get('assigned_agency') != getattr(user, 'department', None):
                 return Response({"error": "Corrective action not found."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(compute_action_metadata(doc))
@@ -439,7 +414,7 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         user = request.user
         role = getattr(user, 'role', Role.CITIZEN)
-        if role in [Role.CITIZEN, Role.IMPLEMENTING_AGENCY]:
+        if role == Role.CITIZEN:
             return Response({"error": "Forbidden: Insufficient permissions to modify action details."}, status=status.HTTP_403_FORBIDDEN)
 
         doc = find_action_doc(pk)
@@ -553,10 +528,6 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
             if not allowed:
                 return Response({"error": reason}, status=status.HTTP_403_FORBIDDEN)
 
-        if role == Role.IMPLEMENTING_AGENCY:
-            if doc.get('assigned_to') != user.username and doc.get('assigned_agency') != getattr(user, 'department', None):
-                return Response({"error": "Forbidden: You are not assigned to this action."}, status=status.HTTP_403_FORBIDDEN)
-
         if doc.get('status') in [ActionStatus.CLOSED, ActionStatus.CANCELLED]:
             return Response({"error": f"Cannot add progress updates to a {doc.get('status')} action."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -624,10 +595,6 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
             allowed, reason = check_user_project_scope(user, p_record)
             if not allowed:
                 return Response({"error": reason}, status=status.HTTP_403_FORBIDDEN)
-
-        if role == Role.IMPLEMENTING_AGENCY:
-            if doc.get('assigned_to') != user.username and doc.get('assigned_agency') != getattr(user, 'department', None):
-                return Response({"error": "Forbidden: You are not assigned to this action."}, status=status.HTTP_403_FORBIDDEN)
 
         current_status = doc.get('status')
         if current_status not in [ActionStatus.ASSIGNED, ActionStatus.IN_PROGRESS, ActionStatus.REOPENED]:
@@ -850,10 +817,6 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
             allowed, reason = check_user_project_scope(user, p_record)
             if not allowed:
                 return Response({"error": reason}, status=status.HTTP_403_FORBIDDEN)
-
-        if role == Role.IMPLEMENTING_AGENCY:
-            if doc.get('assigned_to') != user.username and doc.get('assigned_agency') != getattr(user, 'department', None):
-                return Response({"error": "Forbidden: You are not assigned to this action."}, status=status.HTTP_403_FORBIDDEN)
 
         history = doc.get('audit_history', [])
         return Response({

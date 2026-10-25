@@ -208,11 +208,6 @@ DRISHTI_DEV_BYPASS_PROFILES = {
         'department': _env_or_none('DRISHTI_DEV_FIELD_DEPARTMENT'),
         'assigned_project_ids': _env_list('DRISHTI_DEV_FIELD_PROJECTS'),
     },
-    'IMPLEMENTING_AGENCY': {
-        'username': os.getenv('DRISHTI_DEV_AGENCY_USERNAME', 'dev_implementing_agency'),
-        'department': os.getenv('DRISHTI_DEV_AGENCY_DEPARTMENT', 'Roads & Highways') or None,
-        'assigned_project_ids': _env_list('DRISHTI_DEV_AGENCY_PROJECTS'),
-    },
     'CITIZEN': {
         'username': os.getenv('DRISHTI_DEV_CITIZEN_USERNAME', 'dev_citizen'),
     },
