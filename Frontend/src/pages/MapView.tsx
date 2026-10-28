@@ -133,20 +133,34 @@ const riskColor = (r: number) =>
 function MapController({
   selected,
   stateFilter,
-  markers
+  markers,
+  focusKey,
+  resetTrigger
 }: {
   selected: Marker | null
   stateFilter: string
   markers: Marker[]
+  focusKey: number
+  resetTrigger: number
 }) {
   const map = useMap()
 
-  // Fly to selected project when clicked
+  // Fly to selected project when clicked - zoom in close (level 15) to reveal satellite imagery of site
   useEffect(() => {
     if (selected && typeof selected.lat === "number" && typeof selected.lng === "number") {
-      map.flyTo([selected.lat, selected.lng], Math.max(map.getZoom(), 8), { duration: 1.0 })
+      map.flyTo([selected.lat, selected.lng], 15, {
+        duration: 1.4,
+        easeLinearity: 0.25
+      })
     }
-  }, [selected, map])
+  }, [selected, focusKey, map])
+
+  // Reset to national overview
+  useEffect(() => {
+    if (resetTrigger > 0) {
+      map.flyTo([22.8, 79.6], 5, { duration: 1.2 })
+    }
+  }, [resetTrigger, map])
 
   // Fit bounds when state filter changes
   useEffect(() => {
@@ -154,12 +168,12 @@ function MapController({
       const stateMarkers = markers.filter(m => m.location === stateFilter)
       if (stateMarkers.length > 0) {
         const bounds = L.latLngBounds(stateMarkers.map(m => [m.lat, m.lng]))
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 8 })
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 })
       }
-    } else if (stateFilter === "All States" && markers.length > 0) {
+    } else if (stateFilter === "All States" && markers.length > 0 && resetTrigger === 0) {
       map.setView([22.8, 79.6], 5)
     }
-  }, [stateFilter, markers, map])
+  }, [stateFilter, markers, map, resetTrigger])
 
   return null
 }
@@ -169,9 +183,16 @@ export default function MapView() {
   const { user } = useAuth()
   const canViewRisk = hasCapability(user?.role, "view_internal_risk")
   const [selected, setSelected] = useState<Marker | null>(null)
+  const [focusKey, setFocusKey] = useState<number>(0)
+  const [resetTrigger, setResetTrigger] = useState<number>(0)
   const [mapLayer, setMapLayer] = useState<"satellite" | "dark" | "streets">("satellite")
   const [filters, setFilters] = useState({ risk: "all", state: "All States", sector: "All Types" })
   const [markers, setMarkers] = useState<Marker[]>([])
+
+  const handleSelectMarker = (m: Marker) => {
+    setSelected(m)
+    setFocusKey(k => k + 1)
+  }
 
   useEffect(() => {
     projectService.getProjects().then(res => {
@@ -292,7 +313,7 @@ export default function MapView() {
                     ? "border-navy-500 bg-blue-50 shadow-sm"
                     : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
                   }`}
-                onClick={() => setSelected(m)}
+                onClick={() => handleSelectMarker(m)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -343,8 +364,14 @@ export default function MapView() {
 
       {/* Map area */}
       <div className="flex-1 relative bg-navy-900 overflow-hidden">
-        <MapContainer center={[22.8, 79.6]} zoom={5} style={{ height: "100%", width: "100%", zIndex: 1 }}>
-          <MapController selected={selected} stateFilter={filters.state} markers={markers} />
+        <MapContainer center={[22.8, 79.6]} zoom={5} maxZoom={19} style={{ height: "100%", width: "100%", zIndex: 1 }}>
+          <MapController
+            selected={selected}
+            stateFilter={filters.state}
+            markers={markers}
+            focusKey={focusKey}
+            resetTrigger={resetTrigger}
+          />
           
           {mapLayer === "satellite" && (
             <>
@@ -383,35 +410,58 @@ export default function MapView() {
             const rc = riskColor(m.risk)
             const isSelected = selected?.id === m.id
             return (
-              <CircleMarker
-                key={m.id}
-                center={[m.lat, m.lng]}
-                radius={isSelected ? 10 : 7}
-                pathOptions={{
-                  fillColor: rc.bg,
-                  fillOpacity: 0.85,
-                  color: isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.4)",
-                  weight: isSelected ? 3 : 1
-                }}
-                eventHandlers={{
-                  click: () => setSelected(isSelected ? null : m)
-                }}
-              >
-                <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
-                  <div style={{ fontSize: "11px", fontWeight: 600, color: "#0b1f4b" }}>
-                    <span style={{ fontFamily: "monospace", fontWeight: 700 }}>#{m.id}</span> • 📍 {m.displayLocation}
-                    <div style={{ fontSize: "10px", color: "#64748b", maxWidth: "220px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
-                      {m.name}
+              <span key={m.id}>
+                {isSelected && (
+                  <CircleMarker
+                    center={[m.lat, m.lng]}
+                    radius={22}
+                    pathOptions={{
+                      fillColor: rc.bg,
+                      fillOpacity: 0.2,
+                      color: "#ffffff",
+                      weight: 2,
+                      dashArray: "4, 4"
+                    }}
+                  />
+                )}
+                <CircleMarker
+                  center={[m.lat, m.lng]}
+                  radius={isSelected ? 11 : 7}
+                  pathOptions={{
+                    fillColor: rc.bg,
+                    fillOpacity: isSelected ? 1.0 : 0.85,
+                    color: "#ffffff",
+                    weight: isSelected ? 3.5 : 1
+                  }}
+                  eventHandlers={{
+                    click: (e) => {
+                      e.originalEvent?.stopPropagation?.()
+                      handleSelectMarker(m)
+                    }
+                  }}
+                >
+                  <Tooltip
+                    key={isSelected ? `perm-${m.id}` : `hover-${m.id}`}
+                    direction="top"
+                    offset={[0, isSelected ? -12 : -8]}
+                    opacity={0.95}
+                    permanent={isSelected}
+                  >
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#0b1f4b" }}>
+                      <span style={{ fontFamily: "monospace", color: "#d97706" }}>#{m.id}</span> • 📍 {m.displayLocation}
+                      <div style={{ fontSize: "10px", color: "#475569", fontWeight: 500, maxWidth: "220px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
+                        {m.name}
+                      </div>
                     </div>
-                  </div>
-                </Tooltip>
-              </CircleMarker>
+                  </Tooltip>
+                </CircleMarker>
+              </span>
             )
           })}
         </MapContainer>
 
-        {/* Map Layer Mode Switcher (Satellite, Dark, Streets) */}
-        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10 }} className="flex bg-white/95 backdrop-blur-md p-1 rounded-xl shadow-[0_4px_24px_rgba(11,31,75,0.2)] border border-slate-200/90 gap-1">
+        {/* Map Layer Mode Switcher & Overview Reset */}
+        <div style={{ position: "absolute", top: 16, right: 16, zIndex: 10 }} className="flex bg-white/95 backdrop-blur-md p-1 rounded-xl shadow-[0_4px_24px_rgba(11,31,75,0.2)] border border-slate-200/90 gap-1 items-center">
           <button
             onClick={() => setMapLayer("satellite")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -447,6 +497,18 @@ export default function MapView() {
           >
             <span>🛣️</span>
             <span>Streets</span>
+          </button>
+          <div className="w-[1px] h-5 bg-slate-200 mx-0.5" />
+          <button
+            onClick={() => {
+              setSelected(null)
+              setResetTrigger(t => t + 1)
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-navy-900 hover:bg-slate-100 transition-all"
+            title="Reset to full India overview"
+          >
+            <span>🇮🇳</span>
+            <span>Overview</span>
           </button>
         </div>
 
@@ -511,6 +573,12 @@ export default function MapView() {
                   ✕
                 </button>
               </div>
+            </div>
+
+            {/* Coordinates & Location badge */}
+            <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100 mb-2">
+              <span>📍 {selected.lat.toFixed(4)}° N, {selected.lng.toFixed(4)}° E</span>
+              <span className="font-sans font-medium text-slate-400">{selected.sector}</span>
             </div>
 
             {/* Project Title (clamped to 2 lines so long names stay compact) */}
