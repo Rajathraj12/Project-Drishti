@@ -11,7 +11,6 @@ const iconByPath: Record<string, typeof GridIcon> = {
   "/evidence": ShieldIcon,
   "/actions": CheckCircleIcon,
   "/contractors": BuildingIcon,
-  "/reports": ClipboardIcon,
   "/report": ClipboardIcon,
   "/my-reports": ClipboardIcon,
   "/admin": BuildingIcon,
@@ -24,12 +23,17 @@ export default function AppShell() {
 
   const handleLogout = () => {
     logout()
-    if (!isDevBypass) {
-      navigate("/login")
-    }
+    navigate("/login")
   }
 
-  const initials = user?.username ? user.username.substring(0, 2).toUpperCase() : "U"
+  const displayName = user?.first_name
+    ? `${user.first_name} ${user.last_name || ''}`.trim()
+    : (user?.username || "Authorized User")
+
+  const initials = user?.first_name && user?.last_name
+    ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
+    : (user?.username ? user.username.substring(0, 2).toUpperCase() : "AU")
+
   const navItems = visibleNavItems(user?.role)
   const pageAllowed = canAccessPath(user?.role, location.pathname)
 
@@ -62,7 +66,7 @@ export default function AppShell() {
         <div style={{ maxWidth: "100%", padding: "0 28px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => navigate(landingPath(user?.role))}>
-            <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 44, objectFit: "contain" }} />
+            <img src="/logo.png" alt="Project Drishti Logo" style={{ height: 48, objectFit: "contain" }} />
             <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--color-navy-900)", letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}>Drishti</span>
           </div>
 
@@ -72,14 +76,15 @@ export default function AppShell() {
               <span style={{ color: "#16a34a", fontWeight: 600 }}>Live</span>
             </div>
 
-            <div className="user-chip">
+            <div className="user-chip" title={`${displayName} (${user?.email || ''}) - ${user?.department || ''}`}>
               <div className="user-avatar">{initials}</div>
               <div>
                 <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2 }}>
-                  {user?.username || "Dev User"}
+                  {displayName}
                 </div>
-                <div style={{ fontSize: "0.6rem", color: "var(--color-text-muted)", textTransform: "capitalize", letterSpacing: "0.04em" }}>
-                  {user?.role?.replace(/_/g, " ").toLowerCase() || "Role"}
+                <div style={{ fontSize: "0.62rem", color: "var(--color-navy-700)", fontWeight: 600, textTransform: "capitalize", letterSpacing: "0.02em" }}>
+                  {user?.role?.replace(/_/g, " ") || "Authorized"}
+                  {user?.department ? ` • ${user.department.split(' - ')[0]}` : ''}
                 </div>
               </div>
             </div>

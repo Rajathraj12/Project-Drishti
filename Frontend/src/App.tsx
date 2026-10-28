@@ -30,7 +30,7 @@ export default function App() {
             <Route path="/projects" element={<ProjectsList />} />
             <Route path="/projects/:id" element={<ProjectDetails />} />
             <Route path="/actions" element={<Actions />} />
-            <Route path="/reports" element={<Reports />} />
+            <Route path="/reports" element={<Navigate to="/dashboard" replace />} />
             <Route path="/map" element={<MapView />} />
             <Route path="/project-map" element={<Navigate to="/map" replace />} />
             <Route path="/evidence" element={<Evidence />} />

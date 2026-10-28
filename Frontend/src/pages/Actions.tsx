@@ -882,18 +882,39 @@ export default function Actions() {
                       {/* Finding Link Tags */}
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
                         {action.risk_assessment_id && (
-                          <span style={{ fontSize: "0.68rem", background: "#fef3c7", color: "#92400e", padding: "2px 7px", borderRadius: 4, fontWeight: 600 }}>
-                            Rule Finding: {action.risk_assessment_id}
+                          <span
+                            title={`Rule-Based Risk Finding UUID: ${action.risk_assessment_id}\n(Links this corrective action to the deterministic rule engine finding)`}
+                            style={{
+                              fontSize: "0.68rem", background: "#fef3c7", color: "#92400e",
+                              padding: "2px 7px", borderRadius: 4, fontWeight: 600,
+                              cursor: "default", display: "inline-flex", alignItems: "center", gap: 4
+                            }}
+                          >
+                            <span>📐 Rule Finding:</span>
+                            <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.66rem", background: "rgba(146,64,14,0.1)", padding: "1px 4px", borderRadius: 3 }}>
+                              #{action.risk_assessment_id.substring(0, 8)}
+                            </code>
                           </span>
                         )}
                         {action.ml_assessment_id && (
-                          <span style={{ fontSize: "0.68rem", background: "#f3e8ff", color: "#6b21a8", padding: "2px 7px", borderRadius: 4, fontWeight: 600 }}>
-                            ML Flag: {action.ml_assessment_id}
+                          <span
+                            title={`Machine Learning Anomaly Detection UUID: ${action.ml_assessment_id}\n(Links this corrective action to the ML model anomaly detection flag)`}
+                            style={{
+                              fontSize: "0.68rem", background: "#f3e8ff", color: "#6b21a8",
+                              padding: "2px 7px", borderRadius: 4, fontWeight: 600,
+                              cursor: "default", display: "inline-flex", alignItems: "center", gap: 4
+                            }}
+                          >
+                            <span>🤖 ML Flag:</span>
+                            <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.66rem", background: "rgba(107,33,168,0.1)", padding: "1px 4px", borderRadius: 3 }}>
+                              #{action.ml_assessment_id.substring(0, 8)}
+                            </code>
                           </span>
                         )}
                         {action.evidence_ids && action.evidence_ids.length > 0 && (
-                          <span style={{ fontSize: "0.68rem", background: "#e0f2fe", color: "#0369a1", padding: "2px 7px", borderRadius: 4, fontWeight: 600 }}>
-                            {action.evidence_ids.length} Attached Evidences
+                          <span style={{ fontSize: "0.68rem", background: "#e0f2fe", color: "#0369a1", padding: "2px 7px", borderRadius: 4, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                            <span>📷</span>
+                            <span>{action.evidence_ids.length} Attached Evidences</span>
                           </span>
                         )}
                       </div>

@@ -125,8 +125,40 @@ def is_public_project(project_doc):
     return project_doc.get('verification_status') == 'VERIFIED'
 
 
+STATE_SYNONYMS = {
+    'hp': 'himachal pradesh',
+    'himachal pradesh': 'himachal pradesh',
+    'pb': 'punjab',
+    'punjab': 'punjab',
+    'dl': 'delhi',
+    'delhi': 'delhi',
+    'ka': 'karnataka',
+    'karnataka': 'karnataka',
+    'mh': 'maharashtra',
+    'maharashtra': 'maharashtra',
+    'gj': 'gujarat',
+    'gujarat': 'gujarat',
+}
+
+def state_matches(state_a, state_b):
+    if not state_a or not state_b:
+        return True
+    sa = STATE_SYNONYMS.get(str(state_a).strip().lower(), str(state_a).strip().lower())
+    sb = STATE_SYNONYMS.get(str(state_b).strip().lower(), str(state_b).strip().lower())
+    return sa == sb
+
+def state_query_clause(user_state):
+    if not user_state:
+        return user_state
+    s = str(user_state).strip()
+    if s.upper() == 'HP':
+        return {'': ['HP', 'Himachal Pradesh']}
+    if s.upper() == 'PB':
+        return {'': ['PB', 'Punjab']}
+    return user_state
+
 def matches_jurisdiction(user, project_doc):
-    if user.state and project_doc.get('state') and user.state != project_doc.get('state'):
+    if user.state and project_doc.get('state') and not state_matches(user.state, project_doc.get('state')):
         return False
     if user.district and project_doc.get('district') and user.district != project_doc.get('district'):
         return False
@@ -244,7 +276,7 @@ def mongo_project_query(user):
         if assigned:
             query['project_id'] = {'$in': assigned}
         if user.state:
-            query['state'] = user.state
+            query['state'] = state_query_clause(user.state)
         if user.district:
             query['district'] = user.district
         if user.department:
@@ -258,7 +290,7 @@ def mongo_project_query(user):
         elif not (user.state or user.district or user.department):
             return {'_id': {'$exists': False}}
         if user.state:
-            query['state'] = user.state
+            query['state'] = state_query_clause(user.state)
         if user.district:
             query['district'] = user.district
         if user.department:

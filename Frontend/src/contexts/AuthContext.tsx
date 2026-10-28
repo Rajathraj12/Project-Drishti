@@ -40,23 +40,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem('token');
-    if (!token && !isDevBypass) {
+    if (!token) {
+      if (isDevBypass) {
+        const storedRole = normalizeRole(localStorage.getItem('dev_role'));
+        if (storedRole) {
+          const devUser = { ...DEFAULT_DEV_USER, role: storedRole };
+          setUser(devUser);
+          return devUser;
+        }
+      }
       setUser(null);
       return null;
     }
     try {
       const u = await authService.getCurrentUser();
       const role = normalizeRole(u.role);
-      const normalized = { ...u, role: role || (isDevBypass ? "ADMIN" : u.role) };
+      const normalized = { ...u, role: role || u.role };
       setUser(normalized);
       return normalized;
     } catch {
-      if (isDevBypass) {
-        const storedRole = normalizeRole(localStorage.getItem('dev_role') || "ADMIN") || "ADMIN";
-        const devUser = { ...DEFAULT_DEV_USER, role: storedRole };
-        setUser(devUser);
-        return devUser;
-      }
+      localStorage.removeItem('token');
       setUser(null);
       return null;
     }
@@ -65,17 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const token = localStorage.getItem('token');
-    if (token || isDevBypass) {
+    if (token || (isDevBypass && localStorage.getItem('dev_role'))) {
       refreshUser()
         .catch(() => {
           if (!cancelled) {
             localStorage.removeItem('token');
-            if (isDevBypass) {
-              const storedRole = normalizeRole(localStorage.getItem('dev_role') || "ADMIN") || "ADMIN";
-              setUser({ ...DEFAULT_DEV_USER, role: storedRole });
-            } else {
-              setUser(null);
-            }
+            setUser(null);
           }
         })
         .finally(() => {
@@ -99,12 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('dev_role');
+    setDevRoleState(null);
     setUser(null);
     setDataEpoch((value) => value + 1);
-    if (isDevBypass && devRole) {
-      setLoading(true);
-      refreshUser().finally(() => setLoading(false));
-    }
   };
 
   const setDevRole = async (role: string) => {

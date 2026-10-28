@@ -223,9 +223,9 @@ const DASHBOARD_MENU_ITEMS = [
     iconColor: "#4f46e5",
   },
   {
-    title: "Audit & Analytical Reports",
-    desc: "Exportable analytics, executive summaries & compliance dossiers",
-    path: "/reports",
+    title: "Executive Oversight & Analytics",
+    desc: "National infrastructure KPIs, risk distributions & milestone tracking",
+    path: "/dashboard",
     badge: "Official",
     badgeBg: "rgba(168, 85, 247, 0.1)",
     badgeColor: "#7e22ce",
@@ -761,29 +761,18 @@ export default function Landing() {
               <img
                 src="/logo.png"
                 alt="Project Drishti logo"
-                style={{ height: 40, width: 40, objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(11,31,75,0.14))" }}
+                style={{ height: 52, width: 52, objectFit: "contain", filter: "drop-shadow(0 2px 6px rgba(11,31,75,0.14))" }}
               />
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{
-                  fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.25rem",
-                  color: C.navy900, letterSpacing: "-0.03em", lineHeight: 1.1,
-                }}>
-                  Drishti
-                </span>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 4,
-                  background: "rgba(34, 197, 94, 0.09)", border: "1px solid rgba(34, 197, 94, 0.25)",
-                  borderRadius: 99, padding: "2px 7px",
-                  fontSize: "0.62rem", fontWeight: 700, color: "#15803d", letterSpacing: "0.04em",
-                }}>
-                  <span className="live-dot" style={{ width: 6, height: 6 }} />
-                  LIVE
-                </span>
-              </div>
               <span style={{
-                fontSize: "0.6rem", fontWeight: 700, color: C.slate,
+                fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.45rem",
+                color: C.navy900, letterSpacing: "-0.03em", lineHeight: 1.1,
+              }}>
+                Drishti
+              </span>
+              <span style={{
+                fontSize: "0.62rem", fontWeight: 700, color: C.slate,
                 letterSpacing: "0.07em", textTransform: "uppercase", marginTop: 2,
               }}>
                 Civic Infrastructure Intelligence
@@ -1187,10 +1176,10 @@ export default function Landing() {
 
           {/* Right actions */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {/* Reports access button */}
+            {/* Projects access button */}
             <button
               id="landing-reports-btn"
-              onClick={() => navigate(isAuthenticated ? "/reports" : "/dashboard")}
+              onClick={() => navigate(isAuthenticated ? "/projects" : "/login")}
               style={{
                 background: "rgba(255, 255, 255, 0.85)",
                 border: "1.5px solid rgba(203, 213, 225, 0.85)",
@@ -1224,8 +1213,8 @@ export default function Landing() {
                 el.style.boxShadow = "0 1px 3px rgba(11, 31, 75, 0.04)"
               }}
             >
-              <FileTextIcon size={14} color="currentColor" />
-              <span>Reports</span>
+              <LayersIcon size={14} color="currentColor" />
+              <span>Projects</span>
             </button>
 
             {/* Primary Action Button */}
@@ -1420,7 +1409,7 @@ export default function Landing() {
             {/* Mobile CTA */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
-                onClick={() => { navigate("/reports"); setMobileOpen(false) }}
+                onClick={() => { navigate(isAuthenticated ? "/projects" : "/login"); setMobileOpen(false) }}
                 style={{
                   width: "100%", background: "#eff6ff", color: "#1d4ed8",
                   border: "1px solid #bfdbfe", borderRadius: 10, padding: "11px 16px",
@@ -1429,8 +1418,8 @@ export default function Landing() {
                   justifyContent: "center", gap: 6,
                 }}
               >
-                <FileTextIcon size={15} />
-                View Audit & Reports
+                <LayersIcon size={15} />
+                Explore Projects
               </button>
 
               <button
@@ -2565,10 +2554,10 @@ export default function Landing() {
                 Open Dashboard <ArrowRight size={13} />
               </button>
 
-              {isAuthenticated && canViewReports && (
+              {isAuthenticated && (
                 <button
                   id="editorial-reports-btn"
-                  onClick={() => navigate("/reports")}
+                  onClick={() => navigate("/dashboard")}
                   style={{
                     background: "rgba(255,255,255,0.08)",
                     border: "1px solid rgba(255,255,255,0.2)",
@@ -2581,7 +2570,7 @@ export default function Landing() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.14)" }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)" }}
                 >
-                  View Reports <ArrowRight size={13} />
+                  View Analytics <ArrowRight size={13} />
                 </button>
               )}
             </div>
@@ -2716,7 +2705,7 @@ export default function Landing() {
               {[
                 { label: "Dashboard", action: () => navigate(isAuthenticated ? "/dashboard" : "/login") },
                 { label: "Projects", action: () => navigate(isAuthenticated ? "/projects" : "/login") },
-                { label: "Reports", action: () => navigate(isAuthenticated ? "/reports" : "/login") },
+                { label: "Contractors", action: () => navigate(isAuthenticated ? "/contractors" : "/login") },
                 { label: "Map View", action: () => navigate(isAuthenticated ? "/map" : "/login") },
               ].map(l => (
                 <button

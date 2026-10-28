@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-    CustomTokenObtainPairView, get_current_user, logout_view,
+    CustomTokenObtainPairView, get_current_user, logout_view, demo_users_view,
     UserViewSet, evidence_collection, reports_collection,
 )
 
@@ -15,6 +15,7 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(permission_classes=[AllowAny]), name='auth_refresh'),
     path('auth/logout/', logout_view, name='auth_logout'),
     path('auth/me/', get_current_user, name='auth_me'),
+    path('auth/demo-users/', demo_users_view, name='auth_demo_users'),
     path('evidence/', evidence_collection, name='evidence_collection'),
     path('reports/', reports_collection, name='reports_collection'),
     path('', include(router.urls)),

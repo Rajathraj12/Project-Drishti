@@ -1,4 +1,5 @@
-from rest_framework import viewsets, status
+from django.db.models import Q
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -12,7 +13,24 @@ from core.serializers import UserAdminSerializer, serialize_user
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
+
     def validate(self, attrs):
+        login_id = attrs.get('username') or attrs.get('email')
+        if not login_id:
+            raise serializers.ValidationError({"detail": "Username or email is required."})
+
+        login_id = str(login_id).strip()
+        user_obj = User.objects.filter(
+            Q(username__iexact=login_id) | Q(email__iexact=login_id)
+        ).first()
+
+        if user_obj:
+            attrs['username'] = user_obj.username
+        else:
+            attrs['username'] = login_id
+
         data = super().validate(attrs)
         user = self.user
         data['token'] = data['access']
@@ -23,6 +41,101 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def demo_users_view(request):
+    """
+    Returns example seed accounts for all user types.
+    Reads live from MongoDB Atlas drishti_db.users;
+    falls back to default seed list if MongoDB is momentarily unreachable.
+    """
+    import os
+    mongo_uri = os.getenv('MONGO_URI')
+    users_list = []
+
+    if mongo_uri:
+        try:
+            from pymongo import MongoClient
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=4000)
+            db = client['drishti_db']
+            docs = list(db['users'].find({}, {'_id': 0}))
+            client.close()
+            if docs:
+                users_list = docs
+        except Exception:
+            pass
+
+    if not users_list:
+        users_list = [
+            {
+                "username": "admin",
+                "email": "admin@drishti.gov.in",
+                "password_plain": "Admin@123",
+                "role": "ADMIN",
+                "first_name": "Rajesh",
+                "last_name": "Sharma",
+                "full_name": "Rajesh Sharma",
+                "department": "MoSPI - Infrastructure Oversight",
+                "state": "Delhi",
+                "district": "New Delhi",
+                "assigned_projects": ["DR-0001", "DR-0002", "DR-0003", "DR-0004", "DR-0005"],
+                "description": "National PMO Administrator with complete systemic oversight, user governance, and audit authority.",
+                "icon": "shield",
+                "badge_color": "#1e3a8a",
+            },
+            {
+                "username": "govt_officer",
+                "email": "officer@drishti.gov.in",
+                "password_plain": "Officer@123",
+                "role": "GOVERNMENT_OFFICER",
+                "first_name": "Priya",
+                "last_name": "Nair",
+                "full_name": "Priya Nair",
+                "department": "Ministry of Road Transport & Highways",
+                "state": "PB",
+                "district": "Ludhiana",
+                "assigned_projects": ["DR-0001", "DR-0002", "DR-0003"],
+                "description": "State & Ministry oversight officer approving milestones, reviewing ML risk alerts, and assigning corrective actions.",
+                "icon": "award",
+                "badge_color": "#0d9488",
+            },
+            {
+                "username": "field_officer",
+                "email": "field@drishti.gov.in",
+                "password_plain": "Field@123",
+                "role": "FIELD_OFFICER",
+                "first_name": "Amit",
+                "last_name": "Patel",
+                "full_name": "Amit Patel",
+                "department": "National Highways Authority of India (NHAI)",
+                "state": "HP",
+                "district": "Shimla",
+                "assigned_projects": ["DR-0009", "DR-0010", "DR-0011"],
+                "description": "Site verification engineer conducting ground inspections, geotagged evidence capture, and drone telemetry audits.",
+                "icon": "camera",
+                "badge_color": "#d97706",
+            },
+            {
+                "username": "citizen",
+                "email": "citizen@drishti.gov.in",
+                "password_plain": "Citizen@123",
+                "role": "CITIZEN",
+                "first_name": "Ananya",
+                "last_name": "Verma",
+                "full_name": "Ananya Verma",
+                "department": "Civic Transparency Watch",
+                "state": "Karnataka",
+                "district": "Bengaluru Urban",
+                "assigned_projects": [],
+                "description": "Public citizen auditor monitoring taxpayer infrastructure spend, verifying public assets, and reporting local site issues.",
+                "icon": "users",
+                "badge_color": "#2563eb",
+            },
+        ]
+
+    return Response({"count": len(users_list), "users": users_list})
 
 
 class IsAdminRole(IsAuthenticated):

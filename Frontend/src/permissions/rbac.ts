@@ -70,7 +70,6 @@ export const NAV_ITEMS: { label: string; path: string }[] = [
   { label: 'Inspections', path: '/inspections' },
   { label: 'Evidence', path: '/evidence' },
   { label: 'Corrective Actions', path: '/actions' },
-  { label: 'Reports', path: '/reports' },
   { label: 'Citizen Report', path: '/report' },
   { label: 'My Reports', path: '/my-reports' },
   { label: 'Admin', path: '/admin' },
