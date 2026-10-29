@@ -16,6 +16,8 @@ export interface User {
   department?: string;
   assigned_project_ids?: string[];
   dev_bypass?: boolean;
+  is_active?: boolean;
+  full_name?: string;
 }
 
 export interface State {

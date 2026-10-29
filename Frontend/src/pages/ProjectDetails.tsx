@@ -120,6 +120,7 @@ export default function ProjectDetails() {
   const [actionAgency, setActionAgency] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
   const [showCalculationModal, setShowCalculationModal] = useState(false)
+  const [showVerifyModal, setShowVerifyModal] = useState(false)
 
   const fetchAssessments = () => {
     if (!id) return;
@@ -369,9 +370,26 @@ export default function ProjectDetails() {
             {canViewEvidence && (
             <button
               onClick={() => navigate(`/evidence?projectId=${id}`)}
-              className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg hover:bg-navy-700 font-500 transition-colors"
+              className="text-sm bg-navy-800 text-white px-4 py-2 rounded-lg hover:bg-navy-700 font-500 transition-colors cursor-pointer"
             >
               View Evidence
+            </button>
+            )}
+
+            {canVerify && (
+            <button
+              onClick={() => {
+                setVerifyStatus(project.verification_status || "IN_REVIEW");
+                setShowVerifyModal(true);
+              }}
+              className="text-sm bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Official Verification & Review Sign-off"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>Verify / Review Project</span>
             </button>
             )}
           </div>
@@ -1297,6 +1315,79 @@ export default function ProjectDetails() {
         </div>
       )}
 
+      {/* Official Project Verification Modal */}
+      {showVerifyModal && canVerify && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-[#0b1f4b] text-white p-4 px-6 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base">Official Project Verification Review</h3>
+                <p className="text-xs text-slate-300">Certify project data & site findings for #{project.project_id}</p>
+              </div>
+              <button onClick={() => setShowVerifyModal(false)} className="text-white text-lg cursor-pointer">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Target Verification Status *</label>
+                <select
+                  value={verifyStatus}
+                  onChange={e => setVerifyStatus(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 font-bold text-slate-800 bg-white outline-none cursor-pointer"
+                >
+                  <option value="NOT_REVIEWED">NOT_REVIEWED (Audit Pending)</option>
+                  <option value="IN_REVIEW">IN_REVIEW (Active Field / Satellite Audit)</option>
+                  <option value="VERIFIED">VERIFIED (Certified Accurate Ground Truth)</option>
+                  <option value="CLOSED">CLOSED (Audit Concluded / Archived)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Official Review Notes *</label>
+                <textarea
+                  rows={3}
+                  value={verifyNotes}
+                  onChange={e => setVerifyNotes(e.target.value)}
+                  placeholder="Enter inspection findings, comparison with satellite passes, or physical milestone certification notes..."
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Evidence Reference / ID (Optional)</label>
+                <input
+                  type="text"
+                  value={verifyEvidence}
+                  onChange={e => setVerifyEvidence(e.target.value)}
+                  placeholder="e.g. SAT-2026-0892 or Drone Pass #4"
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowVerifyModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={verifyLoading}
+                  onClick={async () => {
+                    await handleVerify();
+                    setShowVerifyModal(false);
+                  }}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {verifyLoading ? "Saving..." : "Submit Official Verification"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

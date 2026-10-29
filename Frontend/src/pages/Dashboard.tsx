@@ -250,7 +250,7 @@ export default function Dashboard() {
                             margin: 0,
                           }}
                         >
-                          Priority States Infrastructure Overview (HP, PB, KA)
+                          National Infrastructure Portfolio Overview
                         </h2>
                         <span
                           style={{
@@ -318,6 +318,7 @@ export default function Dashboard() {
                         unit: "Projects",
                         tag: selectedState === "All States" ? "All Jurisdictions" : selectedState,
                         sub: "Active capital projects in scope",
+                        path: "/projects",
                         accentColor: "#2563eb",
                         iconBg: "#eff6ff",
                         icon: (
@@ -334,6 +335,7 @@ export default function Dashboard() {
                         unit: "Cr",
                         tag: "Baseline Outlay",
                         sub: "Initial approved capital allocation",
+                        path: "/projects",
                         accentColor: "#d97706",
                         iconBg: "#fef3c7",
                         icon: (
@@ -348,6 +350,7 @@ export default function Dashboard() {
                         unit: "Cr",
                         tag: "Approved Revision",
                         sub: "Sanctioned revised outlay",
+                        path: "/projects",
                         accentColor: "#0284c7",
                         iconBg: "#e0f2fe",
                         icon: (
@@ -364,6 +367,7 @@ export default function Dashboard() {
                         unit: "Cr",
                         tag: `${utilizationPct}% Utilized`,
                         sub: "Cumulative financial disbursement",
+                        path: "/projects",
                         accentColor: "#059669",
                         iconBg: "#d1fae5",
                         icon: (
@@ -379,6 +383,7 @@ export default function Dashboard() {
                         unit: "Cr",
                         tag: `+${costEscalationPct}% Variance`,
                         sub: "Cumulative approved cost escalation",
+                        path: "/projects",
                         accentColor: "#ea580c",
                         iconBg: "#fff7ed",
                         icon: (
@@ -394,6 +399,7 @@ export default function Dashboard() {
                         unit: "",
                         tag: "Milestone Mean",
                         sub: "Weighted physical execution rate",
+                        path: "/projects",
                         accentColor: "#4f46e5",
                         iconBg: "#eef2ff",
                         icon: (
@@ -409,6 +415,7 @@ export default function Dashboard() {
                         unit: "Verified",
                         tag: "100% PAIMANA",
                         sub: "Central government federated records",
+                        path: "/projects",
                         accentColor: "#7c3aed",
                         iconBg: "#f5f3ff",
                         icon: (
@@ -424,6 +431,7 @@ export default function Dashboard() {
                         unit: "Flagged",
                         tag: "Priority Attention",
                         sub: "Identified by rule-based risk engine",
+                        path: "/map",
                         accentColor: "#e11d48",
                         iconBg: "#ffe4e6",
                         icon: (
@@ -440,6 +448,7 @@ export default function Dashboard() {
                         unit: "Outliers",
                         tag: "Isolation Forest",
                         sub: "Multi-dimensional statistical outliers",
+                        path: "/map",
                         accentColor: "#0d9488",
                         iconBg: "#ccfbf1",
                         icon: (
@@ -456,6 +465,7 @@ export default function Dashboard() {
                     ].map((s, i) => (
                       <div
                         key={s.label}
+                        onClick={() => navigate(s.path || "/projects")}
                         className={`animate-fade-in-up delay-${(i + 1) * 100}`}
                         style={{
                           background: "#ffffff",
@@ -469,7 +479,7 @@ export default function Dashboard() {
                           overflow: "hidden",
                           boxShadow: "0 1px 3px rgba(11, 31, 75, 0.03)",
                           transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease",
-                          cursor: "default",
+                          cursor: "pointer",
                         }}
                         onMouseEnter={(e) => {
                           const el = e.currentTarget as HTMLElement

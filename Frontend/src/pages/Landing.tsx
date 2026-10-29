@@ -8,7 +8,7 @@
  */
 
 import { useNavigate } from "react-router-dom"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useAuth } from "../contexts/AuthContext"
 import { hasCapability } from "../permissions/rbac"
 import { projectService } from "../services/projectService"
@@ -574,10 +574,28 @@ export default function Landing() {
       .finally(() => setProjLoading(false))
   }, [])
 
-  // Derive flagged projects: real High Risk or ML Anomaly indications from MongoDB
-  const flaggedProjects = projects
-    .filter((p) => riskLabel(p) === "High Risk" || riskLabel(p) === "Medium Risk" || p.anomaly_flag || p.anomaly_status === "ANOMALOUS")
-    .slice(0, 4)
+  // Derive flagged projects: real High Risk or ML Anomaly indications from MongoDB (prioritizing High Risk first)
+  const flaggedProjects = useMemo(() => {
+    const list = projects.filter(
+      (p) =>
+        riskLabel(p) === "High Risk" ||
+        riskLabel(p) === "Medium Risk" ||
+        p.anomaly_flag ||
+        p.anomaly_status === "ANOMALOUS"
+    )
+
+    // Prioritize High Risk projects first
+    list.sort((a, b) => {
+      const aScore = riskLabel(a) === "High Risk" ? 2 : riskLabel(a) === "Medium Risk" ? 1 : 0
+      const bScore = riskLabel(b) === "High Risk" ? 2 : riskLabel(b) === "Medium Risk" ? 1 : 0
+      return bScore - aScore
+    })
+
+    if (list.length > 0) {
+      return list.slice(0, 4)
+    }
+    return projects.slice(0, 4)
+  }, [projects])
 
   // ── nav items ────────────────────────────────────────────────────────────────
 

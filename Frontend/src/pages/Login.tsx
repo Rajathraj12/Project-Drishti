@@ -591,7 +591,7 @@ export default function Login() {
                     const bStyle = getRoleBadgeStyle(u.role)
                     return (
                       <div
-                        key={u.role}
+                        key={u.username || u.email || u.role}
                         onClick={() => handleSelectOfficialDemoUser(u, false)}
                         className={`mini-card ${isSelected ? "selected" : ""}`}
                         style={{

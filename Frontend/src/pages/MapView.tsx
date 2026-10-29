@@ -25,7 +25,7 @@ type Marker = {
 }
 
 // Authentic geographical coordinates for all projects across India
-const PROJECT_COORDS: Record<string, { lat: number; lng: number; district?: string }> = {
+export const PROJECT_COORDS: Record<string, { lat: number; lng: number; district?: string }> = {
   // Punjab projects (Ludhiana, Moga, Jalandhar, Kapurthala, Bathinda, Barnala, Sirhind/Mohali)
   "DR-0001": { lat: 30.6822, lng: 75.8210, district: "Ludhiana" },
   "DR-0002": { lat: 30.9530, lng: 75.6020, district: "Ludhiana" },
@@ -235,6 +235,18 @@ export default function MapView() {
         }
       })
       setMarkers(newMarkers)
+      // If a project is requested in URL query params (e.g. from an Officer clicking a citizen grievance)
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const targetId = params.get('project')
+        if (targetId) {
+          const match = newMarkers.find(m => m.id.toUpperCase() === targetId.toUpperCase())
+          if (match) {
+            setSelected(match)
+            setFocusKey(k => k + 1)
+          }
+        }
+      } catch (e) {}
     })
   }, [])
 

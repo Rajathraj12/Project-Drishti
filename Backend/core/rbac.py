@@ -29,6 +29,9 @@ PUBLIC_PROJECT_FIELDS = (
     'data_source_type',
     'verification_status',
     'is_public',
+    'risk_level',
+    'anomaly_flag',
+    'anomaly_status',
 )
 
 INTERNAL_ONLY_FIELDS = (
@@ -65,7 +68,7 @@ CAPABILITIES = {
     'manage_users': {Role.ADMIN},
     'write_project': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'create_project': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
-    'view_contractors': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
+    'view_contractors': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.CITIZEN},
     'view_inspections': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'view_internal_reports': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'view_public_reports': {
@@ -352,39 +355,25 @@ def sanitize_project_payload(user, payload):
     data = dict(payload)
     if not has_capability(user, 'view_internal_risk'):
         for field in (
-            'risk_score', 'risk_level', 'rules_triggered', 'rule_signals',
-            'attention_level', 'why_flagged'
+            'rules_triggered', 'rule_signals', 'attention_level', 'why_flagged'
         ):
             data.pop(field, None)
     if not has_capability(user, 'view_ml_assessment'):
         for field in (
-            'ml_anomaly_score', 'anomaly_flag', 'anomaly_status',
             'ml_explanation', 'explanation', 'features_used'
         ):
             data.pop(field, None)
     role = get_role(user)
-    if role == Role.CITIZEN:
+    if role in (Role.CITIZEN, None):
         public = {field: data.get(field) for field in PUBLIC_PROJECT_FIELDS if field in data}
-        public['project_id'] = data.get('project_id')
-        public['project_name'] = data.get('project_name')
-        public['state'] = data.get('state')
-        public['district'] = data.get('district', '')
-        public['sector'] = data.get('sector')
-        public['original_cost'] = data.get('original_cost')
-        public['original_cost_cr'] = data.get('original_cost_cr') or data.get('original_cost')
-        public['revised_cost'] = data.get('revised_cost')
-        public['revised_cost_cr'] = data.get('revised_cost_cr') or data.get('revised_cost')
-        public['expenditure'] = data.get('expenditure')
-        public['expenditure_cr'] = data.get('expenditure_cr') or data.get('expenditure')
-        public['reported_progress'] = data.get('reported_progress')
-        public['reported_progress_pct'] = data.get('reported_progress_pct') or data.get('reported_progress')
-        public['data_source_type'] = data.get('data_source_type')
-        public['source_project_id'] = data.get('source_project_id')
-        public['verification_status'] = data.get('verification_status')
-        public['risk_level'] = data.get('risk_level')
-        public['risk_score'] = data.get('risk_score')
-        public['ml_anomaly_score'] = data.get('ml_anomaly_score')
-        public['anomaly_flag'] = data.get('anomaly_flag')
-        public['anomaly_status'] = data.get('anomaly_status')
+        for k in (
+            'project_id', 'project_name', 'state', 'district', 'sector', 'department',
+            'original_cost', 'original_cost_cr', 'revised_cost', 'revised_cost_cr',
+            'expenditure', 'expenditure_cr', 'reported_progress', 'reported_progress_pct',
+            'data_source_type', 'source_project_id', 'verification_status', 'is_public',
+            'risk_level', 'risk_score', 'ml_anomaly_score', 'anomaly_flag', 'anomaly_status'
+        ):
+            if k in data and data.get(k) is not None:
+                public[k] = data.get(k)
         return public
     return data

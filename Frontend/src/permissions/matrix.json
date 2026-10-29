@@ -30,21 +30,24 @@
       "path": "/contractors",
       "roles": [
         "ADMIN",
-        "GOVERNMENT_OFFICER"
+        "GOVERNMENT_OFFICER",
+        "CITIZEN"
       ]
     },
     {
       "path": "/contractors/:id",
       "roles": [
         "ADMIN",
-        "GOVERNMENT_OFFICER"
+        "GOVERNMENT_OFFICER",
+        "CITIZEN"
       ]
     },
     {
       "path": "/contractor/:id",
       "roles": [
         "ADMIN",
-        "GOVERNMENT_OFFICER"
+        "GOVERNMENT_OFFICER",
+        "CITIZEN"
       ]
     },
     {
@@ -108,6 +111,9 @@
     {
       "path": "/my-reports",
       "roles": [
+        "ADMIN",
+        "GOVERNMENT_OFFICER",
+        "FIELD_OFFICER",
         "CITIZEN"
       ]
     }
@@ -186,7 +192,8 @@
     ],
     "view_contractors": [
       "ADMIN",
-      "GOVERNMENT_OFFICER"
+      "GOVERNMENT_OFFICER",
+      "CITIZEN"
     ],
     "view_inspections": [
       "ADMIN",

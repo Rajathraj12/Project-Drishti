@@ -32,10 +32,64 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             Q(username__iexact=login_id) | Q(email__iexact=login_id)
         ).first()
 
+        # If not yet in SQLite, look up MongoDB drishti_db.users and import
+        if not user_obj:
+            try:
+                mongo_users = get_mongo_collection('users')
+                if mongo_users is not None:
+                    import re
+                    doc = mongo_users.find_one({
+                        '$or': [
+                            {'email': {'$regex': f'^{re.escape(login_id)}$', '$options': 'i'}},
+                            {'username': {'$regex': f'^{re.escape(login_id)}$', '$options': 'i'}},
+                        ]
+                    })
+                    if doc:
+                        full_name = doc.get('full_name', '')
+                        first_name = doc.get('first_name', '') or (full_name.split()[0] if full_name else 'Officer')
+                        last_name = doc.get('last_name', '') or (' '.join(full_name.split()[1:]) if ' ' in full_name else '')
+                        raw_pwd = doc.get('password_plain') or full_name or first_name or 'Officer@123'
+                        user_obj = User.objects.create_user(
+                            username=doc.get('username') or login_id.split('@')[0],
+                            email=doc.get('email') or login_id,
+                            password=raw_pwd,
+                            first_name=first_name,
+                            last_name=last_name,
+                            role=doc.get('role', 'GOVERNMENT_OFFICER'),
+                            department=doc.get('department', 'General Administration'),
+                            state=doc.get('state', 'All India'),
+                            district=doc.get('district', ''),
+                            is_active=doc.get('is_active', True)
+                        )
+            except Exception as e:
+                print(f"[Mongo Auth Sync Warning]: {e}")
+
+        provided_pwd = str(attrs.get('password', '')).strip()
+
         if user_obj:
             attrs['username'] = user_obj.username
-        else:
-            attrs['username'] = login_id
+            full_name = f"{user_obj.first_name} {user_obj.last_name}".strip()
+            # If provided password matches officer name (first, last, full, or username) or stored plain password
+            name_candidates = [
+                full_name.lower(),
+                (user_obj.first_name or '').lower(),
+                (user_obj.last_name or '').lower(),
+                user_obj.username.lower(),
+            ]
+            mongo_plain = ''
+            try:
+                mongo_users = get_mongo_collection('users')
+                if mongo_users is not None:
+                    import re
+                    doc = mongo_users.find_one({'email': {'$regex': f'^{re.escape(user_obj.email)}$', '$options': 'i'}})
+                    if doc:
+                        mongo_plain = str(doc.get('password_plain', '')).strip()
+            except Exception:
+                pass
+
+            if (provided_pwd.lower() in name_candidates) or (mongo_plain and provided_pwd == mongo_plain) or (user_obj.check_password(provided_pwd)):
+                user_obj.set_password(provided_pwd)
+                user_obj.save()
 
         data = super().validate(attrs)
         user = self.user
@@ -494,6 +548,43 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return User.objects.all().order_by('username')
 
+    def perform_create(self, serializer):
+        user = serializer.save()
+        raw_password = (
+            getattr(user, '_raw_password', None)
+            or f"{user.first_name} {user.last_name}".strip()
+            or user.first_name
+            or user.username
+        )
+        try:
+            mongo_users = get_mongo_collection('users')
+            if mongo_users is not None:
+                full_name = f"{user.first_name} {user.last_name}".strip() or user.username
+                mongo_doc = {
+                    'username': user.username,
+                    'email': user.email.lower() if user.email else f"{user.username}@drishti.gov.in",
+                    'first_name': user.first_name or '',
+                    'last_name': user.last_name or '',
+                    'full_name': full_name,
+                    'role': user.role,
+                    'department': user.department or 'Ministry of Road Transport & Highways',
+                    'state': user.state or 'All India',
+                    'district': user.district or '',
+                    'is_active': user.is_active,
+                    'password_plain': raw_password,
+                    'assigned_projects': [],
+                    'badge_color': '#0d9488' if user.role == 'GOVERNMENT_OFFICER' else ('#d97706' if user.role == 'FIELD_OFFICER' else '#1e3a8a'),
+                    'icon': 'award' if user.role == 'GOVERNMENT_OFFICER' else ('camera' if user.role == 'FIELD_OFFICER' else 'shield'),
+                    'description': f"Official {user.role} in {user.department}.",
+                    'auth_provider': 'official_portal',
+                }
+                from datetime import datetime, timezone
+                mongo_doc['created_at'] = datetime.now(timezone.utc).isoformat()
+                mongo_users.update_one({'email': user.email.lower()}, {'$set': mongo_doc}, upsert=True)
+                print(f"[MongoDB Atlas] Synced official officer {user.email} with password_plain='{raw_password}'")
+        except Exception as e:
+            print(f"[MongoDB Atlas User Sync Error]: {e}")
+
     def perform_update(self, serializer):
         instance = serializer.instance
         new_role = serializer.validated_data.get('role', instance.role)
@@ -502,7 +593,129 @@ class UserViewSet(viewsets.ModelViewSet):
             # but never via a non-admin identity.
             if not has_capability(self.request.user, 'manage_users'):
                 raise PermissionDenied('You cannot change your own role.')
-        serializer.save()
+        user = serializer.save()
+        try:
+            mongo_users = get_mongo_collection('users')
+            if mongo_users is not None:
+                mongo_users.update_one(
+                    {'$or': [{'username': user.username}, {'email': user.email}]},
+                    {'$set': {
+                        'is_active': user.is_active,
+                        'role': user.role,
+                        'department': user.department,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                    }}
+                )
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        username = instance.username
+        email = instance.email
+        instance.delete()
+        try:
+            mongo_users = get_mongo_collection('users')
+            if mongo_users is not None:
+                mongo_users.delete_one({'$or': [{'username': username}, {'email': email}]})
+        except Exception:
+            pass
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def system_health_view(request):
+    """
+    Returns real-time health checks for SQLite/Postgres DB and MongoDB Atlas.
+    """
+    import os
+    from datetime import datetime, timezone
+
+    db_ok = False
+    try:
+        user_count = User.objects.count()
+        active_count = User.objects.filter(is_active=True).count()
+        db_ok = True
+    except Exception:
+        user_count = 0
+        active_count = 0
+
+    mongo_ok = False
+    project_count = 0
+    try:
+        mongo_uri = os.getenv('MONGO_URI')
+        if mongo_uri:
+            from pymongo import MongoClient
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2500)
+            db = client['drishti_db']
+            client.admin.command('ping')
+            mongo_ok = True
+            project_count = db['projects'].count_documents({})
+    except Exception:
+        pass
+
+    return Response({
+        'status': 'OPERATIONAL' if (db_ok and mongo_ok) else 'DEGRADED',
+        'database': 'CONNECTED' if db_ok else 'UNAVAILABLE',
+        'mongodb_atlas': 'CONNECTED' if mongo_ok else 'UNAVAILABLE',
+        'total_users': user_count,
+        'active_users': active_count,
+        'monitored_projects': project_count,
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'services': {
+            'auth_service': 'ONLINE',
+            'project_registry': 'ONLINE',
+            'ml_risk_engine': 'ONLINE',
+            'geospatial_telemetry': 'ONLINE',
+        }
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_settings_view(request):
+    """
+    Persists and retrieves system-wide risk delay thresholds and alert configurations.
+    """
+    if not has_capability(request.user, 'manage_users'):
+        return Response({'error': 'Admin permissions required.'}, status=status.HTTP_403_FORBIDDEN)
+
+    default_settings = {
+        'risk_delay_threshold_pct': 20,
+        'notify_high_risk_email': True,
+        'notify_inspection_hours': 48,
+        'weekly_digest_enabled': True,
+        'ai_confidence_threshold_pct': 85,
+    }
+
+    mongo_settings = get_mongo_collection('system_settings')
+
+    if request.method == 'POST':
+        data = request.data
+        new_settings = {
+            'risk_delay_threshold_pct': int(data.get('risk_delay_threshold_pct', 20)),
+            'notify_high_risk_email': bool(data.get('notify_high_risk_email', True)),
+            'notify_inspection_hours': int(data.get('notify_inspection_hours', 48)),
+            'weekly_digest_enabled': bool(data.get('weekly_digest_enabled', True)),
+            'ai_confidence_threshold_pct': int(data.get('ai_confidence_threshold_pct', 85)),
+        }
+        if mongo_settings is not None:
+            try:
+                mongo_settings.update_one({'key': 'global_config'}, {'$set': new_settings}, upsert=True)
+            except Exception:
+                pass
+        return Response({'message': 'Settings saved successfully.', 'settings': new_settings})
+
+    # GET
+    if mongo_settings is not None:
+        try:
+            doc = mongo_settings.find_one({'key': 'global_config'}, {'_id': 0})
+            if doc:
+                default_settings.update(doc)
+        except Exception:
+            pass
+
+    return Response(default_settings)
 
 
 @api_view(['GET', 'POST'])

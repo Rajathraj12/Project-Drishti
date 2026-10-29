@@ -1,3 +1,4 @@
+import secrets
 from rest_framework import serializers
 from core.models import User, Role, ProjectAssignment
 from core.rbac import assigned_project_ids, get_role
@@ -40,8 +41,11 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         assigned = validated_data.pop('assigned_project_ids', [])
-        password = validated_data.pop('password', None) or User.objects.make_random_password()
-        user = User.objects.create_user(password=password, **validated_data)
+        raw_pwd = validated_data.pop('password', None)
+        if not raw_pwd or not str(raw_pwd).strip():
+            raw_pwd = f"{validated_data.get('first_name', '')} {validated_data.get('last_name', '')}".strip() or validated_data.get('first_name') or validated_data.get('username') or 'Officer@123'
+        user = User.objects.create_user(password=raw_pwd, **validated_data)
+        user._raw_password = raw_pwd
         self._set_assignments(user, assigned)
         return user
 

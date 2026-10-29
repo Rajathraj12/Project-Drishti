@@ -37,9 +37,12 @@ class DevAuthBypassAuthentication(BaseAuthentication):
         user, _ = User.objects.get_or_create(username=username)
 
         user.role = requested_role
+        user.email = profile.get('email') or f'{username}@drishti.gov.in'
+        if not user.first_name:
+            user.first_name = profile.get('first_name') or requested_role.replace('_', ' ').title()
         user.state = profile.get('state') or None
         user.district = profile.get('district') or None
-        user.department = profile.get('department') or None
+        user.department = profile.get('department') or 'National PMO Oversight'
         user.is_active = True
         user.save()
 

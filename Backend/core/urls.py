@@ -6,6 +6,7 @@ from .views import (
     CustomTokenObtainPairView, get_current_user, logout_view, demo_users_view,
     citizen_register_view, citizen_login_view, google_auth_view,
     UserViewSet, evidence_collection, reports_collection,
+    system_health_view, admin_settings_view,
 )
 
 router = DefaultRouter()
@@ -22,5 +23,7 @@ urlpatterns = [
     path('auth/google/', google_auth_view, name='google_auth'),
     path('evidence/', evidence_collection, name='evidence_collection'),
     path('reports/', reports_collection, name='reports_collection'),
+    path('system/health/', system_health_view, name='system_health'),
+    path('system/settings/', admin_settings_view, name='system_settings'),
     path('', include(router.urls)),
 ]

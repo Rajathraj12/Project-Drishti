@@ -102,7 +102,16 @@ export function visibleNavItems(role: string | null | undefined) {
       { label: 'Map View', path: '/map' },
       { label: 'Contractors', path: '/contractors' },
       { label: 'Citizen Report', path: '/report' },
+      { label: 'My Reports', path: '/my-reports' },
     ]
   }
-  return NAV_ITEMS.filter((item) => canAccessPath(role, item.path))
+  const normalized = normalizeRole(role)
+  return NAV_ITEMS
+    .filter((item) => canAccessPath(role, item.path))
+    .map((item) => {
+      if (item.path === '/my-reports' && normalized !== 'CITIZEN') {
+        return { ...item, label: 'Citizen Grievances' }
+      }
+      return item
+    })
 }
