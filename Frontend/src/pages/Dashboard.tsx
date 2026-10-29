@@ -37,7 +37,9 @@ export default function Dashboard() {
   }, [dataEpoch])
   
   const fetchProjects = async () => {
-    setLoading(true)
+    if (allProjects.length === 0) {
+      setLoading(true)
+    }
     try {
       const response = await projectService.getProjects()
       setAllProjects(response.results || [])

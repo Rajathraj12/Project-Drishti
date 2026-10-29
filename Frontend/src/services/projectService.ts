@@ -4,11 +4,19 @@
 import { fetchApi } from './api';
 import { Project, RiskAssessment } from '../types';
 
+// In-memory client-side cache for project listings
+let _projectsCache: {
+  key: string;
+  data: { count: number; results: Project[] };
+  timestamp: number;
+} | null = null;
+const CACHE_TTL_MS = 30000; // 30 seconds
+
 export const projectService = {
   /**
-   * Future implementation: GET /api/projects
+   * GET /api/projects
    */
-  async getProjects(params?: Record<string, string | number>): Promise<{count: number, results: Project[]}> {
+  async getProjects(params?: Record<string, string | number>, force = false): Promise<{count: number, results: Project[]}> {
     let query = '';
     if (params) {
       const searchParams = new URLSearchParams();
@@ -20,7 +28,23 @@ export const projectService = {
       const queryString = searchParams.toString();
       if (queryString) query = `?${queryString}`;
     }
-    return fetchApi<{count: number, results: Project[]}>(`/projects/${query}`);
+
+    const now = Date.now();
+    if (!force && _projectsCache && _projectsCache.key === query && (now - _projectsCache.timestamp < CACHE_TTL_MS)) {
+      return _projectsCache.data;
+    }
+
+    const data = await fetchApi<{count: number, results: Project[]}>(`/projects/${query}`);
+    _projectsCache = {
+      key: query,
+      data,
+      timestamp: now,
+    };
+    return data;
+  },
+
+  clearCache() {
+    _projectsCache = null;
   },
 
   /**
@@ -34,6 +58,7 @@ export const projectService = {
    * POST /api/projects/ - Create project in MongoDB Atlas
    */
   async createProject(projectData: Partial<Project>): Promise<Project> {
+    projectService.clearCache();
     return fetchApi<Project>('/projects/', {
       method: 'POST',
       body: JSON.stringify(projectData),
@@ -44,6 +69,7 @@ export const projectService = {
    * PATCH /api/projects/{id} - Update project in MongoDB Atlas
    */
   async updateProject(id: string, updates: Partial<Project>): Promise<Project> {
+    projectService.clearCache();
     return fetchApi<Project>(`/projects/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -54,6 +80,7 @@ export const projectService = {
    * DELETE /api/projects/{id} - Delete project from MongoDB Atlas
    */
   async deleteProject(id: string): Promise<{ message: string; project_id?: string }> {
+    projectService.clearCache();
     return fetchApi<{ message: string; project_id?: string }>(`/projects/${id}/`, {
       method: 'DELETE',
     });
@@ -77,6 +104,7 @@ export const projectService = {
    * POST /api/projects/{id}/analyze
    */
   async triggerAnalysis(id: string): Promise<RiskAssessment> {
+    projectService.clearCache();
     return fetchApi<RiskAssessment>(`/projects/${id}/analyze/`, { method: 'POST' });
   },
 
@@ -84,6 +112,7 @@ export const projectService = {
    * POST /api/projects/bulk-analyze/
    */
   async bulkAnalyzeProjects(): Promise<{total_projects: number, successful: number, unavailable: number, failures: number}> {
+    projectService.clearCache();
     return fetchApi<any>(`/projects/bulk-analyze/`, { method: 'POST' });
   },
 
@@ -92,10 +121,12 @@ export const projectService = {
   },
 
   async triggerMlAnalysis(id: string): Promise<any> {
+    projectService.clearCache();
     return fetchApi<any>(`/projects/${id}/ml-analyze/`, { method: 'POST' });
   },
 
   async submitVerification(id: string, data: any): Promise<any> {
+    projectService.clearCache();
     return fetchApi<any>(`/projects/${id}/verify/`, {
       method: 'POST',
       body: JSON.stringify(data)

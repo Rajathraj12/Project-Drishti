@@ -58,6 +58,9 @@ export default function ProjectsList() {
   const navigate = useNavigate();
 
   const fetchProjects = async () => {
+    if (projects.length === 0) {
+      setLoading(true);
+    }
     try {
       const response = await projectService.getProjects();
       setProjects(response.results || []);

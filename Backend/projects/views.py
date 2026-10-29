@@ -1,3 +1,34 @@
+import os
+import time
+from pymongo import MongoClient
+
+_SHARED_MONGO_CLIENT = None
+_PROJECTS_CACHE = {}
+
+def get_shared_mongo_db():
+    global _SHARED_MONGO_CLIENT
+    mongo_uri = os.getenv('MONGO_URI')
+    if not mongo_uri:
+        return None
+    if _SHARED_MONGO_CLIENT is None:
+        try:
+            _SHARED_MONGO_CLIENT = MongoClient(
+                mongo_uri,
+                maxPoolSize=50,
+                minPoolSize=5,
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000,
+                socketTimeoutMS=10000,
+            )
+        except Exception as e:
+            print(f"[MongoDB Pool Init Error]: {e}")
+            return None
+    return _SHARED_MONGO_CLIENT['drishti_db']
+
+def invalidate_projects_cache():
+    global _PROJECTS_CACHE
+    _PROJECTS_CACHE.clear()
+
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -94,21 +125,25 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return obj
 
     def list(self, request, *args, **kwargs):
-        """Fetch exclusively from MongoDB Atlas."""
-        import os
-        from pymongo import MongoClient
-        from rest_framework.response import Response
+        """Fetch exclusively from MongoDB Atlas with persistent connection pool & cache."""
+        now = time.time()
+        scope = request.query_params.get('scope', 'default')
+        user_id = getattr(request.user, 'id', 'anonymous') if request.user and request.user.is_authenticated else 'public'
+        role = get_role(request.user) if request.user and request.user.is_authenticated else 'GUEST'
+        cache_key = f"{role}:{user_id}:{scope}"
         
-        mongo_uri = os.getenv('MONGO_URI')
-        if not mongo_uri:
+        if cache_key in _PROJECTS_CACHE:
+            cached_data, expiry = _PROJECTS_CACHE[cache_key]
+            if now < expiry:
+                return Response(cached_data)
+
+        db = get_shared_mongo_db()
+        if db is None:
             return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
             collection = db['projects']
             
-            scope = request.query_params.get('scope')
             if scope == 'all' and (not getattr(request.user, 'is_authenticated', False) or has_capability(request.user, 'view_contractors')):
                 query = {'data_source_type': {'$ne': 'SYNTHETIC_DEMO'}}
             else:
@@ -118,7 +153,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             assessments = list(db['risk_assessments'].find({"project_id": {"$in": project_ids}}))
             ml_assessments = list(db['ml_assessments'].find({"project_id": {"$in": project_ids}}))
             checklist_docs = list(db['inspection_checklists'].find({"project_id": {"$in": project_ids}}))
-            client.close()
+            
             latest_checklists = {c.get("project_id"): c.get("checked_items", {}) for c in checklist_docs}
             
             latest_assessments = {}
@@ -191,16 +226,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 }
                 results.append(sanitize_project_payload(request.user, payload))
                 
-            return Response({
+            response_payload = {
                 "count": len(results),
                 "next": None,
                 "previous": None,
                 "results": results
-            })
+            }
+            _PROJECTS_CACHE[cache_key] = (response_payload, now + 30)
+            return Response(response_payload)
         except Exception as e:
             return Response({"error": f"MongoDB Atlas Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def create(self, request, *args, **kwargs):
+        invalidate_projects_cache()
         """Create a new project document directly in MongoDB Atlas drishti_db.projects."""
         import os
         from datetime import datetime, timezone
@@ -294,6 +332,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return self.partial_update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
+        invalidate_projects_cache()
         """Update a project document in MongoDB Atlas drishti_db.projects."""
         import os
         from datetime import datetime, timezone
@@ -370,6 +409,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": f"Failed to update project in MongoDB: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def destroy(self, request, *args, **kwargs):
+        invalidate_projects_cache()
         """Delete a project document from MongoDB Atlas drishti_db.projects."""
         import os
         from pymongo import MongoClient
@@ -515,6 +555,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def analyze(self, request, pk=None):
+        invalidate_projects_cache()
         self._authorize_project(pk, capability='run_rule_analysis')
         project_doc = self.get_mongo_project(pk)
         if not project_doc:
@@ -603,6 +644,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ml-analyze')
     def ml_analyze(self, request, pk=None):
+        invalidate_projects_cache()
         self._authorize_project(pk, capability='run_ml_analysis')
         project_doc = self.get_mongo_project(pk)
         if not project_doc:
@@ -731,6 +773,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='bulk-analyze')
     def bulk_analyze(self, request):
+        invalidate_projects_cache()
         user = request.user
         if not has_capability(user, 'bulk_analyze'):
             return Response({"error": "Unauthorized to perform bulk analysis"}, status=status.HTTP_403_FORBIDDEN)
@@ -782,6 +825,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='verify')
     def record_verification(self, request, pk=None):
+        invalidate_projects_cache()
         user = request.user
         if not user or not user.is_authenticated:
             return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
