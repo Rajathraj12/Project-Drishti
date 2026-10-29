@@ -17,6 +17,11 @@ export interface Contractor {
   established: number;
   description: string;
   sectors: string[];
+  historicalRiskScore: number;
+  creditRating: string;
+  onTimeDeliveryRate: number;
+  qualityComplianceRate: number;
+  completedProjectsCount: number;
 }
 
 export interface ContractorWithStats extends Contractor {
@@ -29,6 +34,11 @@ export interface ContractorWithStats extends Contractor {
   delayedProjects: number;
   highRiskProjects: number;
   riskLevel: 'Low' | 'Medium' | 'High';
+  historicalRiskScore: number;
+  creditRating: string;
+  onTimeDeliveryRate: number;
+  qualityComplianceRate: number;
+  completedProjectsCount: number;
 }
 
 export const CONTRACTOR_REGISTRY: Contractor[] = [
@@ -43,6 +53,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1938,
     description: "Premier infrastructure and heavy civil construction firm handling expressways, elevated transit, and high-speed rail packages.",
     sectors: ["Roads & Highways", "Railways", "Urban Public Transport"],
+    historicalRiskScore: 18,
+    creditRating: "AAA",
+    onTimeDeliveryRate: 92,
+    qualityComplianceRate: 96,
+    completedProjectsCount: 148,
   },
   {
     id: "CON-DBL",
@@ -55,6 +70,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1987,
     description: "Specialist in highway development, high-volume earthworks, and open-cast coal mining infrastructure.",
     sectors: ["Roads & Highways", "Coal"],
+    historicalRiskScore: 28,
+    creditRating: "AA",
+    onTimeDeliveryRate: 84,
+    qualityComplianceRate: 91,
+    completedProjectsCount: 94,
   },
   {
     id: "CON-AFCONS",
@@ -67,6 +87,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1959,
     description: "Shapoorji Pallonji Group firm known for extreme engineering, viaducts, marine works, and metro transit networks.",
     sectors: ["Urban Public Transport", "Roads & Highways", "Industrial Infrastructure"],
+    historicalRiskScore: 24,
+    creditRating: "AA+",
+    onTimeDeliveryRate: 87,
+    qualityComplianceRate: 94,
+    completedProjectsCount: 112,
   },
   {
     id: "CON-HCC",
@@ -79,6 +104,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1926,
     description: "Pioneering civil engineering firm delivering hydroelectric dams, barrages, water tunnels, and expressway structures.",
     sectors: ["Water Resources", "Water / Power"],
+    historicalRiskScore: 58,
+    creditRating: "BBB",
+    onTimeDeliveryRate: 68,
+    qualityComplianceRate: 82,
+    completedProjectsCount: 86,
   },
   {
     id: "CON-PNC",
@@ -91,6 +121,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1999,
     description: "Leading regional infrastructure player focused on greenfield expressways, highway widening, and rural water supply.",
     sectors: ["Roads & Highways"],
+    historicalRiskScore: 22,
+    creditRating: "AA-",
+    onTimeDeliveryRate: 89,
+    qualityComplianceRate: 93,
+    completedProjectsCount: 76,
   },
   {
     id: "CON-BHEL",
@@ -103,6 +138,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1964,
     description: "Central public sector enterprise engineering power plants, substation transmission, and industrial electrical infrastructure.",
     sectors: ["Electricity Generation", "Transmission & Distribution", "Power & Energy"],
+    historicalRiskScore: 32,
+    creditRating: "A+",
+    onTimeDeliveryRate: 79,
+    qualityComplianceRate: 95,
+    completedProjectsCount: 215,
   },
   {
     id: "CON-IRCON",
@@ -115,6 +155,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1976,
     description: "Government-owned railway construction and telecom networking corporation managing track doubling, signaling, and optical fiber links.",
     sectors: ["Railways", "Telecommunication"],
+    historicalRiskScore: 16,
+    creditRating: "AAA",
+    onTimeDeliveryRate: 93,
+    qualityComplianceRate: 97,
+    completedProjectsCount: 164,
   },
   {
     id: "CON-NPCC",
@@ -127,6 +172,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1957,
     description: "Premier PSU engaged in institutional buildings, healthcare facilities, water resource developments, and border infrastructure.",
     sectors: ["Water Resources", "Healthcare", "Education", "Real Estate", "Urban Development"],
+    historicalRiskScore: 42,
+    creditRating: "BBB+",
+    onTimeDeliveryRate: 74,
+    qualityComplianceRate: 86,
+    completedProjectsCount: 130,
   },
   {
     id: "CON-EIL",
@@ -139,6 +189,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1965,
     description: "Top engineering consultancy and EPC corporation executing refineries, petrochemical complexes, and cross-country pipelines.",
     sectors: ["Oil & Gas"],
+    historicalRiskScore: 14,
+    creditRating: "AAA",
+    onTimeDeliveryRate: 95,
+    qualityComplianceRate: 98,
+    completedProjectsCount: 180,
   },
   {
     id: "CON-BROOF",
@@ -151,6 +206,11 @@ export const CONTRACTOR_REGISTRY: Contractor[] = [
     established: 1920,
     description: "Versatile engineering company specializing in industrial structural fabrication, coal rehabilitation townships, and heavy civil units.",
     sectors: ["Coal / Rehabilitation", "Industrial Infrastructure", "Real Estate"],
+    historicalRiskScore: 20,
+    creditRating: "AA-",
+    onTimeDeliveryRate: 88,
+    qualityComplianceRate: 92,
+    completedProjectsCount: 125,
   },
 ];
 
@@ -189,7 +249,7 @@ export const contractorService = {
    */
   async getContractors(): Promise<ContractorWithStats[]> {
     try {
-      const response = await projectService.getProjects();
+      const response = await projectService.getProjects({ scope: 'all' });
       const allProjects = response.results || [];
 
       // Group projects by contractor ID
@@ -237,15 +297,16 @@ export const contractorService = {
               ) / 10
             : 0;
 
-        const avgRisk =
-          totalProjects > 0
-            ? Math.round(
-                assigned.reduce((sum, p) => {
-                  const r = Number(p.risk_score || 35);
-                  return sum + (isNaN(r) ? 35 : r);
-                }, 0) / totalProjects
-              )
-            : 35;
+        const validScores = assigned
+          .map((p) => (p.risk_score !== null && p.risk_score !== undefined && !isNaN(Number(p.risk_score))) ? Number(p.risk_score) : null)
+          .filter((s): s is number => s !== null);
+
+        // Blended calculation: 50% historical track record + 50% live portfolio projects
+        // If no active projects in current scope, use historical rating directly
+        const liveAvg = validScores.length > 0 ? validScores.reduce((sum, s) => sum + s, 0) / validScores.length : null;
+        const avgRisk = liveAvg !== null 
+          ? Math.round(c.historicalRiskScore * 0.5 + liveAvg * 0.5) 
+          : c.historicalRiskScore;
 
         const delayedProjects = assigned.filter(
           (p) =>
@@ -259,7 +320,13 @@ export const contractorService = {
         ).length;
 
         const riskLevel: "Low" | "Medium" | "High" =
-          avgRisk >= 70 ? "High" : avgRisk >= 50 ? "Medium" : "Low";
+          totalProjects === 0
+            ? "Low"
+            : avgRisk >= 60
+            ? "High"
+            : avgRisk >= 35
+            ? "Medium"
+            : "Low";
 
         return {
           ...c,
@@ -272,6 +339,11 @@ export const contractorService = {
           delayedProjects,
           highRiskProjects,
           riskLevel,
+          historicalRiskScore: c.historicalRiskScore,
+          creditRating: c.creditRating,
+          onTimeDeliveryRate: c.onTimeDeliveryRate,
+          qualityComplianceRate: c.qualityComplianceRate,
+          completedProjectsCount: c.completedProjectsCount,
         };
       });
     } catch (err) {

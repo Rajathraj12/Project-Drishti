@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { authService, DemoUser } from "../services/authService"
+import { signInWithGoogleFirebase } from "../services/firebase"
 import { landingPath } from "../permissions/rbac"
 
 const FALLBACK_DEMO_USERS: DemoUser[] = [
@@ -29,8 +30,8 @@ const FALLBACK_DEMO_USERS: DemoUser[] = [
     last_name: "Nair",
     full_name: "Priya Nair",
     department: "Ministry of Road Transport & Highways",
-    state: "PB",
-    district: "Ludhiana",
+    state: "National / All States",
+    district: "",
     assigned_projects: ["DR-0001", "DR-0002", "DR-0003"],
     description: "State & Ministry oversight officer approving milestones.",
     badge_color: "#0d9488",
@@ -67,20 +68,55 @@ const FALLBACK_DEMO_USERS: DemoUser[] = [
   },
 ]
 
+const INDIAN_STATES = [
+  "Delhi", "Karnataka", "Maharashtra", "Punjab", "Himachal Pradesh",
+  "Uttar Pradesh", "Gujarat", "Tamil Nadu", "Rajasthan", "West Bengal",
+  "Kerala", "Madhya Pradesh", "Bihar", "Andhra Pradesh", "Telangana",
+  "Haryana", "Odisha", "Assam", "Jharkhand", "Chhattisgarh", "Uttarakhand", "All India"
+]
+
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const location = useLocation()
+  const { login, loginCitizen, registerCitizen, loginWithGoogle } = useAuth()
 
+  // Parse URL search params for tab and redirect
+  const queryParams = new URLSearchParams(location.search)
+  const initialTab = queryParams.get("tab") === "officer" ? "officer" : "citizen"
+  const initialSub = queryParams.get("sub") === "register" ? "register" : "signin"
+  const redirectUrl = queryParams.get("redirect") || ""
+
+  // Main portal tab: "citizen" | "officer"
+  const [portalTab, setPortalTab] = useState<"citizen" | "officer">(initialTab)
+
+  // Citizen sub-mode: "signin" | "register"
+  const [citizenMode, setCitizenMode] = useState<"signin" | "register">(initialSub)
+
+  // Official Login Form state
   const [email, setEmail] = useState("admin@drishti.gov.in")
   const [password, setPassword] = useState("Admin@123")
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>("ADMIN")
+
+  // Citizen Sign In form state
+  const [citizenLoginEmail, setCitizenLoginEmail] = useState("citizen@drishti.gov.in")
+  const [citizenLoginPassword, setCitizenLoginPassword] = useState("Citizen@123")
+  const [showCitizenPassword, setShowCitizenPassword] = useState(false)
+
+  // Citizen Register form state
+  const [regFullName, setRegFullName] = useState("")
+  const [regEmail, setRegEmail] = useState("")
+  const [regPassword, setRegPassword] = useState("")
+  const [regState, setRegState] = useState("Delhi")
+  const [regDistrict, setRegDistrict] = useState("")
+  const [regPhone, setRegPhone] = useState("")
+
+  // General loading & error
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [selectedRole, setSelectedRole] = useState<string>("ADMIN")
   const [demoUsers, setDemoUsers] = useState<DemoUser[]>(FALLBACK_DEMO_USERS)
-  const [activeTab, setActiveTab] = useState<"form" | "quick">("form")
 
-  // Fetch live demo accounts from MongoDB endpoint on mount
+  // Fetch demo accounts from MongoDB Atlas endpoint
   useEffect(() => {
     authService.getDemoUsers()
       .then((res) => {
@@ -88,38 +124,140 @@ export default function Login() {
           setDemoUsers(res.users)
         }
       })
-      .catch(() => {
-        // Keeps fallback demo users
-      })
+      .catch(() => {})
   }, [])
 
-  const handleSelectDemoUser = (user: DemoUser, autoSubmit = false) => {
-    setEmail(user.email)
-    setPassword(user.password_plain)
-    setSelectedRole(user.role)
-    setError("")
+  // Keep portal tab in sync with URL parameters
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab')
+    const sub = params.get('sub')
+    if (tab === 'officer') {
+      setPortalTab('officer')
+    } else if (tab === 'citizen') {
+      setPortalTab('citizen')
+    }
+    if (sub === 'register') {
+      setCitizenMode('register')
+    } else if (sub === 'signin') {
+      setCitizenMode('signin')
+    }
+  }, [location.search])
 
-    if (autoSubmit) {
-      executeLogin(user.email, user.password_plain)
+
+  const navigateAfterAuth = (user: any) => {
+    if (redirectUrl) {
+      navigate(redirectUrl)
+    } else {
+      navigate(landingPath(user.role))
     }
   }
 
-  const executeLogin = async (loginUser: string, loginPass: string) => {
+  // Handle real Google Sign-In via Firebase
+  const handleFirebaseGoogleLogin = async () => {
     setLoading(true)
     setError("")
     try {
-      const loggedIn = await login({ username: loginUser, password: loginPass })
-      navigate(landingPath(loggedIn.role))
+      const fbResult = await signInWithGoogleFirebase()
+      if (fbResult && fbResult.email) {
+        const user = await loginWithGoogle({
+          credential: fbResult.idToken,
+          email: fbResult.email,
+          name: fbResult.displayName || fbResult.email.split("@")[0],
+          google_id: fbResult.uid,
+          photo_url: fbResult.photoURL || undefined,
+        })
+        navigateAfterAuth(user)
+      }
     } catch (err: any) {
-      setError(err?.message || "Invalid credentials or backend connection failure. Please verify email and password.")
+      if (err?.code === "auth/popup-closed-by-user") {
+        setLoading(false)
+        return
+      }
+      console.error("Firebase auth error:", err)
+      setError(err?.message || "Google Authentication failed. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Official Ministry login submit
+  const handleOfficialSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    executeLogin(email, password)
+    setLoading(true)
+    setError("")
+    try {
+      const user = await login({ username: email, password })
+      navigateAfterAuth(user)
+    } catch (err: any) {
+      setError(err?.message || "Invalid credentials or unauthorized official access.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Citizen Login submit (MongoDB)
+  const handleCitizenLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError("")
+    try {
+      const user = await loginCitizen({ email: citizenLoginEmail, password: citizenLoginPassword })
+      navigateAfterAuth(user)
+    } catch (err: any) {
+      setError(err?.message || "Invalid citizen email or password.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Citizen Registration submit (MongoDB)
+  const handleCitizenRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!regFullName.trim()) {
+      setError("Please provide your full name.")
+      return
+    }
+    if (!regEmail.includes("@")) {
+      setError("Please provide a valid email address.")
+      return
+    }
+    if (regPassword.length < 6) {
+      setError("Password must be at least 6 characters long.")
+      return
+    }
+
+    setLoading(true)
+    setError("")
+    try {
+      const user = await registerCitizen({
+        full_name: regFullName,
+        email: regEmail,
+        password: regPassword,
+        state: regState,
+        district: regDistrict,
+        phone: regPhone,
+      })
+      navigateAfterAuth(user)
+    } catch (err: any) {
+      setError(err?.message || "Failed to create citizen account. An account with this email may already exist.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSelectOfficialDemoUser = (user: DemoUser, autoSubmit = false) => {
+    setEmail(user.email)
+    setPassword(user.password_plain)
+    setSelectedRole(user.role)
+    setError("")
+    if (autoSubmit) {
+      setLoading(true)
+      login({ username: user.email, password: user.password_plain })
+        .then((u) => navigateAfterAuth(u))
+        .catch((err) => setError(err?.message || "Demo login failed."))
+        .finally(() => setLoading(false))
+    }
   }
 
   const getRoleBadgeStyle = (role: string) => {
@@ -145,32 +283,6 @@ export default function Login() {
       <div className="ambient-orb ambient-orb-3" />
       <div className="grid-overlay" />
 
-      {/* Top Animated Tricolor Ribbon */}
-      <div className="civic-ribbon" />
-
-      {/* Header */}
-      <header className="login-header">
-        <Link to="/" className="brand-link">
-          <div className="logo-glow-wrapper">
-            <img src="/logo.png" alt="Project Drishti Logo" className="header-logo" />
-          </div>
-          <div>
-            <div className="brand-title">
-              Project Drishti
-            </div>
-            <div className="brand-subtitle">
-              Civic Infrastructure Intelligence Portal
-            </div>
-          </div>
-        </Link>
-
-        <div className="header-right">
-          <Link to="/" className="public-portal-link">
-            <span>← Public Portal</span>
-          </Link>
-        </div>
-      </header>
-
       {/* Main Container */}
       <main className="login-main">
         <div className="login-card-container">
@@ -178,25 +290,33 @@ export default function Login() {
           {/* Hero Login Card */}
           <div className="login-card">
             
-            {/* Animated Card Top Accent */}
             <div className="card-top-accent" />
 
-            {/* Header with Radar Logo Effect */}
-            <div className="card-header">
-              <div className="radar-emblem-container">
-                <div className="radar-ring radar-ring-1" />
-                <div className="radar-ring radar-ring-2" />
-                <div className="radar-core">
-                  <img src="/logo.png" alt="Drishti" className="radar-logo" />
+            {/* Portal Switcher Tabs */}
+            <div className="portal-tabs">
+              <button
+                type="button"
+                onClick={() => { setPortalTab("citizen"); setError(""); }}
+                className={`portal-tab-btn ${portalTab === "citizen" ? "active" : ""}`}
+              >
+                <span className="portal-tab-icon">🇮🇳</span>
+                <div>
+                  <div className="portal-tab-title">Citizen Portal</div>
+                  <div className="portal-tab-subtitle">Public Access & Grievances</div>
                 </div>
-              </div>
+              </button>
 
-              <h1 className="card-title">
-                Portal Authentication
-              </h1>
-              <p className="card-subtitle">
-                Official Ministry & Civic Oversight Access
-              </p>
+              <button
+                type="button"
+                onClick={() => { setPortalTab("officer"); setError(""); }}
+                className={`portal-tab-btn ${portalTab === "officer" ? "active" : ""}`}
+              >
+                <span className="portal-tab-icon">🏛️</span>
+                <div>
+                  <div className="portal-tab-title">Ministry Officials</div>
+                  <div className="portal-tab-subtitle">Oversight & Field Audits</div>
+                </div>
+              </button>
             </div>
 
             {error && (
@@ -206,161 +326,335 @@ export default function Login() {
               </div>
             )}
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="auth-form">
-              <div className="input-group">
-                <label className="input-label">
-                  Email Address or Username
-                </label>
-                <div className="input-field-wrapper">
-                  <input
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. admin@drishti.gov.in or admin"
-                    required
-                    className="styled-input"
-                  />
-                  <span className="input-icon">👤</span>
-                </div>
-              </div>
-
-              <div className="input-group">
-                <div className="password-label-row">
-                  <label className="input-label">
-                    Password
-                  </label>
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* TAB 1: CITIZEN PORTAL                                          */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {portalTab === "citizen" && (
+              <div className="citizen-portal-content">
+                
+                {/* Mode Sub-toggle: Sign In vs Register */}
+                <div className="citizen-mode-toggle">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="toggle-password-btn"
+                    onClick={() => { setCitizenMode("signin"); setError(""); }}
+                    className={`mode-btn ${citizenMode === "signin" ? "active" : ""}`}
                   >
-                    {showPassword ? "Hide Password" : "Show Password"}
+                    Citizen Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCitizenMode("register"); setError(""); }}
+                    className={`mode-btn ${citizenMode === "register" ? "active" : ""}`}
+                  >
+                    Create Citizen Account
                   </button>
                 </div>
-                <div className="input-field-wrapper">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter security password"
-                    required
-                    className="styled-input"
-                  />
-                  <span className="input-icon">🔑</span>
-                </div>
-              </div>
 
-              <div className="session-row">
-                <label className="checkbox-label">
-                  <input type="checkbox" defaultChecked className="styled-checkbox" />
-                  <span>Remember Session (24h)</span>
-                </label>
-                <div className="role-tag">
-                  Role: <strong>{selectedRole}</strong>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="submit-btn"
-              >
-                <div className="btn-shimmer" />
-                {loading ? (
-                  <span className="btn-loading-content">
-                    <span className="btn-spinner" />
-                    <span>Verifying JWT Credentials...</span>
-                  </span>
-                ) : (
-                  <span className="btn-content">
-                    <span>Authenticate & Access Portal</span>
-                    <span className="btn-arrow">→</span>
-                  </span>
-                )}
-              </button>
-            </form>
-
-            {/* Divider */}
-            <div className="section-divider">
-              <span className="divider-line" />
-              <span className="divider-text">
-                ⚡ Quick Test Roles
-              </span>
-              <span className="divider-line" />
-            </div>
-
-            {/* Small Compact Mini Role Cards (2x2 Grid) with Micro-Animations */}
-            <div className="mini-cards-grid">
-              {demoUsers.map((u) => {
-                const isSelected = selectedRole === u.role
-                const bStyle = getRoleBadgeStyle(u.role)
-                return (
-                  <div
-                    key={u.role}
-                    onClick={() => handleSelectDemoUser(u, false)}
-                    className={`mini-card ${isSelected ? "selected" : ""}`}
-                    style={{
-                      boxShadow: isSelected ? `0 4px 14px ${bStyle.glow}` : undefined,
-                      borderColor: isSelected ? bStyle.color : undefined,
-                    }}
+                {/* Google Sign In Section */}
+                <div className="google-auth-wrapper">
+                  <button
+                    type="button"
+                    onClick={handleFirebaseGoogleLogin}
+                    disabled={loading}
+                    className="custom-google-btn"
                   >
-                    <div className="mini-card-header">
-                      <span
-                        className="role-pill"
-                        style={{
-                          background: bStyle.bg,
-                          color: bStyle.color,
-                          borderColor: bStyle.border,
-                        }}
-                      >
-                        {u.role.replace(/_/g, " ")}
-                      </span>
-                      <span className="state-pill">
-                        {u.state}
-                      </span>
+                    <svg className="google-icon-svg" viewBox="0 0 24 24" width="20" height="20">
+                      <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                      <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                    <span>{loading ? "Connecting to Google..." : "Sign in with Google"}</span>
+                  </button>
+                </div>
+
+                <div className="section-divider">
+                  <span className="divider-line" />
+                  <span className="divider-text">OR CONTINUE WITH CITIZEN ACCOUNT</span>
+                  <span className="divider-line" />
+                </div>
+
+                {/* Citizen Sign In Form */}
+                {citizenMode === "signin" && (
+                  <form onSubmit={handleCitizenLoginSubmit} className="auth-form">
+                    <div className="input-group">
+                      <label className="input-label">Citizen Email or Username</label>
+                      <div className="input-field-wrapper">
+                        <input
+                          type="text"
+                          value={citizenLoginEmail}
+                          onChange={(e) => setCitizenLoginEmail(e.target.value)}
+                          placeholder="e.g. citizen@drishti.gov.in"
+                          required
+                          className="styled-input"
+                        />
+                        <span className="input-icon">👤</span>
+                      </div>
                     </div>
 
-                    <div className="mini-card-name-row">
-                      <span className="user-name">
-                        {u.full_name || `${u.first_name} ${u.last_name}`}
-                      </span>
-                      {isSelected && (
-                        <span className="active-dot" style={{ background: bStyle.color }} />
-                      )}
+                    <div className="input-group">
+                      <div className="password-label-row">
+                        <label className="input-label">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowCitizenPassword(!showCitizenPassword)}
+                          className="toggle-password-btn"
+                        >
+                          {showCitizenPassword ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                      <div className="input-field-wrapper">
+                        <input
+                          type={showCitizenPassword ? "text" : "password"}
+                          value={citizenLoginPassword}
+                          onChange={(e) => setCitizenLoginPassword(e.target.value)}
+                          placeholder="Enter your citizen password"
+                          required
+                          className="styled-input"
+                        />
+                        <span className="input-icon">🔑</span>
+                      </div>
                     </div>
 
-                    <div className="mini-card-creds">
-                      <span className="cred-chip">{u.email.split('@')[0]}</span>
-                      <span className="cred-pass">{u.password_plain}</span>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="submit-btn citizen-btn"
+                    >
+                      {loading ? "Signing in..." : "Sign In as Citizen →"}
+                    </button>
+                  </form>
+                )}
+
+                {/* Citizen Registration Form (Persists to MongoDB) */}
+                {citizenMode === "register" && (
+                  <form onSubmit={handleCitizenRegisterSubmit} className="auth-form">
+                    <div className="input-group">
+                      <label className="input-label">Full Name *</label>
+                      <div className="input-field-wrapper">
+                        <input
+                          type="text"
+                          value={regFullName}
+                          onChange={(e) => setRegFullName(e.target.value)}
+                          placeholder="e.g. Ramesh Kumar"
+                          required
+                          className="styled-input"
+                        />
+                        <span className="input-icon">👤</span>
+                      </div>
                     </div>
 
-                    <div className="mini-card-actions">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleSelectDemoUser(u, false); }}
-                        className="btn-fill"
-                      >
-                        Fill
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleSelectDemoUser(u, true); }}
-                        className="btn-quick-login"
-                      >
-                        <span>Sign In</span>
-                        <span className="mini-arrow">→</span>
-                      </button>
+                    <div className="input-group">
+                      <label className="input-label">Email Address *</label>
+                      <div className="input-field-wrapper">
+                        <input
+                          type="email"
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          placeholder="name@example.com"
+                          required
+                          className="styled-input"
+                        />
+                        <span className="input-icon">✉️</span>
+                      </div>
+                    </div>
+
+                    <div className="input-group">
+                      <label className="input-label">Create Password * (min 6 characters)</label>
+                      <div className="input-field-wrapper">
+                        <input
+                          type="password"
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          placeholder="Choose a secure password"
+                          required
+                          className="styled-input"
+                        />
+                        <span className="input-icon">🔒</span>
+                      </div>
+                    </div>
+
+                    <div className="grid-2-inputs">
+                      <div className="input-group">
+                        <label className="input-label">State Jurisdiction</label>
+                        <select
+                          value={regState}
+                          onChange={(e) => setRegState(e.target.value)}
+                          className="styled-select"
+                        >
+                          {INDIAN_STATES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="input-group">
+                        <label className="input-label">District (Optional)</label>
+                        <input
+                          type="text"
+                          value={regDistrict}
+                          onChange={(e) => setRegDistrict(e.target.value)}
+                          placeholder="e.g. South Delhi"
+                          className="styled-input-mini"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="submit-btn citizen-btn"
+                    >
+                      {loading ? "Creating account..." : "Create Account & Sign In →"}
+                    </button>
+                  </form>
+                )}
+
+                {/* Guest Browsing Link */}
+                <div className="guest-banner">
+                  <span>Want to explore without logging in?</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/dashboard")}
+                    className="guest-action-btn"
+                  >
+                    Browse as Guest Citizen →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {/* TAB 2: MINISTRY & GOVERNMENT OFFICIALS                         */}
+            {/* ═══════════════════════════════════════════════════════════════ */}
+            {portalTab === "officer" && (
+              <div>
+                <form onSubmit={handleOfficialSubmit} className="auth-form">
+                  <div className="input-group">
+                    <label className="input-label">Official Email or Username</label>
+                    <div className="input-field-wrapper">
+                      <input
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. officer@drishti.gov.in or admin"
+                        required
+                        className="styled-input"
+                      />
+                      <span className="input-icon">🏛️</span>
                     </div>
                   </div>
-                )
-              })}
-            </div>
 
-            {/* Institutional Trust Footer */}
+                  <div className="input-group">
+                    <div className="password-label-row">
+                      <label className="input-label">Security Password</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="toggle-password-btn"
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <div className="input-field-wrapper">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter security password"
+                        required
+                        className="styled-input"
+                      />
+                      <span className="input-icon">🔑</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="submit-btn"
+                  >
+                    {loading ? "Verifying Official Credentials..." : "Authenticate Official Portal →"}
+                  </button>
+                </form>
+
+                {/* Official Quick Test Roles */}
+                <div className="section-divider">
+                  <span className="divider-line" />
+                  <span className="divider-text">⚡ Official Ministry Accounts</span>
+                  <span className="divider-line" />
+                </div>
+
+                <div className="mini-cards-grid">
+                  {demoUsers.filter(u => u.role !== "CITIZEN").map((u) => {
+                    const isSelected = selectedRole === u.role
+                    const bStyle = getRoleBadgeStyle(u.role)
+                    return (
+                      <div
+                        key={u.role}
+                        onClick={() => handleSelectOfficialDemoUser(u, false)}
+                        className={`mini-card ${isSelected ? "selected" : ""}`}
+                        style={{
+                          boxShadow: isSelected ? `0 4px 14px ${bStyle.glow}` : undefined,
+                          borderColor: isSelected ? bStyle.color : undefined,
+                        }}
+                      >
+                        <div className="mini-card-header">
+                          <span
+                            className="role-pill"
+                            style={{
+                              background: bStyle.bg,
+                              color: bStyle.color,
+                              borderColor: bStyle.border,
+                            }}
+                          >
+                            {u.role.replace(/_/g, " ")}
+                          </span>
+                          <span className="state-pill">{u.state}</span>
+                        </div>
+
+                        <div className="mini-card-name-row">
+                          <span className="user-name">
+                            {u.full_name || `${u.first_name} ${u.last_name}`}
+                          </span>
+                          {isSelected && (
+                            <span className="active-dot" style={{ background: bStyle.color }} />
+                          )}
+                        </div>
+
+                        <div className="mini-card-creds">
+                          <span className="cred-chip">{u.email.split('@')[0]}</span>
+                          <span className="cred-pass">{u.password_plain}</span>
+                        </div>
+
+                        <div className="mini-card-actions">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectOfficialDemoUser(u, false); }}
+                            className="btn-fill"
+                          >
+                            Fill
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectOfficialDemoUser(u, true); }}
+                            className="btn-quick-login"
+                          >
+                            <span>Sign In</span>
+                            <span className="mini-arrow">→</span>
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Institutional Seal Footer */}
             <div className="card-footer">
               <div className="footer-seal">
-                <span>🏛️ National Civic Infrastructure Oversight • Project Drishti</span>
+                <span>🏛️ National Infrastructure Oversight • Project Drishti</span>
               </div>
             </div>
 
@@ -369,9 +663,8 @@ export default function Login() {
       </main>
 
       <style>{`
-        /* Global Root Layout */
         .login-root {
-          min-height: 100vh;
+          min-height: calc(100vh - 64px);
           display: flex;
           flex-direction: column;
           background: #070d1e;
@@ -380,7 +673,6 @@ export default function Login() {
           font-family: var(--font-sans, "Inter", sans-serif);
         }
 
-        /* Ambient Glowing Orbs */
         .ambient-orb {
           position: absolute;
           border-radius: 50%;
@@ -403,320 +695,227 @@ export default function Login() {
         .ambient-orb-2 {
           width: 550px;
           height: 550px;
-          background: radial-gradient(circle, #2563eb 0%, #1e3a8a 60%, transparent 80%);
-          bottom: -120px;
+          background: radial-gradient(circle, #1e3a8a 0%, #0c1a3b 60%, transparent 80%);
+          bottom: -150px;
           right: -100px;
-          animation-duration: 18s;
-          animation-delay: -5s;
+          animation-duration: 16s;
         }
 
         .ambient-orb-3 {
-          width: 420px;
-          height: 420px;
-          background: radial-gradient(circle, #0d9488 0%, #047857 60%, transparent 80%);
-          top: 30%;
-          right: 20%;
-          opacity: 0.25;
-          animation-duration: 16s;
-          animation-delay: -8s;
+          width: 400px;
+          height: 400px;
+          background: radial-gradient(circle, #10b981 0%, transparent 70%);
+          top: 40%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          opacity: 0.15;
+          animation-duration: 18s;
         }
 
         @keyframes floatOrb {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(30px, 40px) scale(1.08); }
-          100% { transform: translate(-25px, 20px) scale(0.95); }
+          0% { transform: translateY(0px) scale(1); }
+          100% { transform: translateY(30px) scale(1.05); }
         }
 
-        /* Subtle Cyber Grid Matrix */
         .grid-overlay {
           position: absolute;
           inset: 0;
           background-image: 
             linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-          background-size: 40px 40px;
+          background-size: 36px 36px;
           pointer-events: none;
           z-index: 1;
         }
 
-        /* Top Shimmering Civic Ribbon */
-        .civic-ribbon {
-          height: 3.5px;
-          background: linear-gradient(90deg, #F59E0B 0%, #3B82F6 45%, #10B981 80%, #F59E0B 100%);
-          background-size: 250% 100%;
-          animation: ribbonFlow 6s linear infinite;
-          position: relative;
-          z-index: 10;
-        }
-
-        @keyframes ribbonFlow {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-
-        /* Header */
-        .login-header {
-          padding: 0 32px;
-          height: 70px;
-          background: rgba(7, 13, 30, 0.7);
-          backdrop-filter: blur(14px);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: relative;
-          z-index: 10;
-        }
-
-        .brand-link {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          text-decoration: none;
-        }
-
-        .logo-glow-wrapper {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .header-logo {
-          height: 48px;
-          width: 48px;
-          object-fit: contain;
-          filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.4));
-          transition: transform 0.3s ease;
-        }
-
-        .brand-link:hover .header-logo {
-          transform: scale(1.05) rotate(-2deg);
-        }
-
-        .brand-title {
-          font-family: var(--font-display, "Inter", sans-serif);
-          font-weight: 800;
-          color: #ffffff;
-          font-size: 1.25rem;
-          letter-spacing: -0.02em;
-          line-height: 1;
-        }
-
-        .brand-subtitle {
-          font-size: 0.58rem;
-          color: #94a3b8;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          font-weight: 700;
-          margin-top: 3px;
-        }
-
-        .header-right {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .public-portal-link {
-          font-size: 0.78rem;
-          color: #60a5fa;
-          font-weight: 600;
-          text-decoration: none;
-          padding: 7px 15px;
-          border-radius: 8px;
-          background: rgba(37, 99, 235, 0.12);
-          border: 1px solid rgba(59, 130, 246, 0.3);
-          transition: all 0.2s ease;
-        }
-
-        .public-portal-link:hover {
-          background: rgba(37, 99, 235, 0.22);
-          border-color: rgba(96, 165, 250, 0.6);
-          color: #93c5fd;
-          transform: translateX(-2px);
-        }
-
-        /* Main Container */
         .login-main {
           flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 36px 18px;
+          padding: 36px 16px 60px;
           position: relative;
           z-index: 10;
         }
 
         .login-card-container {
           width: 100%;
-          max-width: 510px;
-          animation: cardReveal 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          max-width: 520px;
         }
 
-        @keyframes cardReveal {
-          from {
-            opacity: 0;
-            transform: translateY(24px) scale(0.98);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        /* High-Impact Glass Card */
         .login-card {
-          background: rgba(255, 255, 255, 0.96);
+          background: rgba(13, 23, 49, 0.88);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border-radius: 20px;
-          border: 1px solid rgba(255, 255, 255, 0.8);
-          padding: 38px 36px 28px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 24px;
+          padding: 28px 32px;
           box-shadow: 
-            0 25px 65px -12px rgba(2, 6, 23, 0.5),
-            0 0 0 1px rgba(255, 255, 255, 0.4),
-            0 0 35px rgba(37, 99, 235, 0.12);
+            0 20px 50px rgba(0, 0, 0, 0.5),
+            0 0 0 1px rgba(255, 255, 255, 0.05),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
           position: relative;
           overflow: hidden;
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .login-card:hover {
-          box-shadow: 
-            0 30px 75px -12px rgba(2, 6, 23, 0.6),
-            0 0 0 1px rgba(255, 255, 255, 0.6),
-            0 0 45px rgba(37, 99, 235, 0.2);
-        }
-
-        /* Card Top Gradient Accent */
         .card-top-accent {
-          height: 4px;
-          background: linear-gradient(90deg, #F59E0B 0%, #2563EB 50%, #0D9488 100%);
-          background-size: 200% 100%;
-          animation: ribbonFlow 5s ease infinite;
-          margin: -38px -36px 26px;
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #3b82f6, #60a5fa, #f59e0b);
         }
 
-        /* Radar Emblem */
-        .card-header {
-          text-align: center;
+        .portal-tabs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          background: rgba(15, 23, 42, 0.7);
+          padding: 5px;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
           margin-bottom: 22px;
         }
 
-        .radar-emblem-container {
-          width: 60px;
-          height: 60px;
-          margin: 0 auto 12px;
-          position: relative;
+        .portal-tab-btn {
           display: flex;
           align-items: center;
-          justify-content: center;
-        }
-
-        .radar-ring {
-          position: absolute;
-          inset: 0;
-          border-radius: 16px;
-          pointer-events: none;
-        }
-
-        .radar-ring-1 {
-          border: 1.5px solid rgba(37, 99, 235, 0.3);
-          animation: radarPing 3s infinite cubic-bezier(0, 0.2, 0.8, 1);
-        }
-
-        .radar-ring-2 {
-          border: 1px solid rgba(245, 158, 11, 0.25);
-          animation: radarPing 3s infinite cubic-bezier(0, 0.2, 0.8, 1);
-          animation-delay: 1.5s;
-        }
-
-        @keyframes radarPing {
-          0% { transform: scale(0.9); opacity: 0.9; }
-          70% { transform: scale(1.4); opacity: 0; }
-          100% { transform: scale(1.5); opacity: 0; }
-        }
-
-        .radar-core {
-          width: 52px;
-          height: 52px;
-          background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
-          border: 1px solid #dbeafe;
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.14);
-          z-index: 2;
-          transition: transform 0.2s ease;
-        }
-
-        .radar-emblem-container:hover .radar-core {
-          transform: scale(1.08) rotate(3deg);
-        }
-
-        .radar-logo {
-          height: 36px;
-          width: 36px;
-          object-fit: contain;
-        }
-
-        .card-title {
-          font-family: var(--font-display, "Inter", sans-serif);
-          font-weight: 800;
-          font-size: 1.5rem;
-          color: #0b1f4b;
-          margin: 0 0 4px;
-          letter-spacing: -0.025em;
-        }
-
-        .card-subtitle {
-          color: #64748b;
-          font-size: 0.82rem;
-          margin: 0;
-          font-weight: 500;
-        }
-
-        /* Error Banner */
-        .error-banner {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #b91c1c;
+          gap: 10px;
           padding: 10px 14px;
-          border-radius: 8px;
-          font-size: 0.8rem;
+          border-radius: 12px;
+          border: none;
+          background: transparent;
+          color: #94a3b8;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: left;
+        }
+
+        .portal-tab-btn.active {
+          background: rgba(30, 58, 138, 0.6);
+          color: #ffffff;
+          box-shadow: 0 4px 12px rgba(30, 58, 138, 0.35);
+          border: 1px solid rgba(96, 165, 250, 0.3);
+        }
+
+        .portal-tab-icon {
+          font-size: 1.3rem;
+        }
+
+        .portal-tab-title {
+          font-size: 0.82rem;
+          font-weight: 700;
+          line-height: 1.2;
+        }
+
+        .portal-tab-subtitle {
+          font-size: 0.65rem;
+          opacity: 0.75;
+          margin-top: 2px;
+        }
+
+        .citizen-mode-toggle {
+          display: flex;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          margin-bottom: 20px;
+          gap: 16px;
+        }
+
+        .mode-btn {
+          background: none;
+          border: none;
+          border-bottom: 2px solid transparent;
+          padding: 8px 4px 12px;
+          color: #94a3b8;
+          font-size: 0.84rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+          color: #60a5fa;
+          border-bottom-color: #3b82f6;
+          font-weight: 700;
+        }
+
+        .google-auth-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .custom-google-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          background: #ffffff;
+          color: #1f2937;
+          border: 1px solid #e5e7eb;
+          padding: 11px 20px;
+          border-radius: 12px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .custom-google-btn:hover {
+          background: #f8fafc;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+          transform: translateY(-1px);
+        }
+
+        .error-banner {
+          background: rgba(239, 68, 68, 0.12);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          border-radius: 12px;
+          padding: 10px 14px;
           margin-bottom: 18px;
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           gap: 8px;
-          animation: shake 0.4s ease;
+          color: #fca5a5;
+          font-size: 0.8rem;
         }
 
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          20%, 60% { transform: translateX(-4px); }
-          40%, 80% { transform: translateX(4px); }
-        }
-
-        /* Form Inputs */
         .auth-form {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 14px;
         }
 
         .input-group {
           display: flex;
           flex-direction: column;
+          gap: 6px;
         }
 
         .input-label {
-          display: block;
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: #1e293b;
-          margin-bottom: 6px;
+          font-size: 0.76rem;
+          font-weight: 600;
+          color: #cbd5e1;
+        }
+
+        .password-label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .toggle-password-btn {
+          background: none;
+          border: none;
+          color: #93c5fd;
+          font-size: 0.7rem;
+          cursor: pointer;
+          font-weight: 500;
         }
 
         .input-field-wrapper {
@@ -727,258 +926,172 @@ export default function Login() {
 
         .styled-input {
           width: 100%;
-          padding: 11px 40px 11px 14px;
-          border-radius: 10px;
-          border: 1.5px solid #cbd5e1;
-          font-size: 0.9rem;
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 12px;
+          padding: 10px 40px 10px 14px;
+          color: #ffffff;
+          font-size: 0.85rem;
           outline: none;
-          font-family: inherit;
-          box-sizing: border-box;
-          background: #ffffff;
-          color: #0f172a;
           transition: all 0.2s ease;
         }
 
         .styled-input:focus {
-          border-color: #2563eb;
-          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
-          background: #fafcff;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+          background: rgba(15, 23, 42, 0.9);
         }
 
         .input-icon {
           position: absolute;
-          right: 12px;
-          font-size: 0.95rem;
+          right: 14px;
+          font-size: 0.85rem;
           opacity: 0.6;
           pointer-events: none;
         }
 
-        .password-label-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 6px;
+        .grid-2-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
         }
 
-        .toggle-password-btn {
-          background: none;
-          border: none;
-          color: #2563eb;
-          font-size: 0.74rem;
-          cursor: pointer;
-          font-weight: 600;
-          padding: 0;
-          transition: color 0.15s ease;
-        }
-
-        .toggle-password-btn:hover {
-          color: #1d4ed8;
-          text-decoration: underline;
-        }
-
-        .session-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin: 2px 0;
-        }
-
-        .checkbox-label {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          cursor: pointer;
-          font-size: 0.78rem;
-          color: #64748b;
-          user-select: none;
-        }
-
-        .styled-checkbox {
-          accent-color: #0b1f4b;
-          cursor: pointer;
-        }
-
-        .role-tag {
-          font-size: 0.72rem;
-          color: #64748b;
-        }
-
-        .role-tag strong {
-          color: #0b1f4b;
-          background: #eef4ff;
-          padding: 2px 6px;
-          border-radius: 4px;
-        }
-
-        /* Submit Button */
-        .submit-btn {
+        .styled-select, .styled-input-mini {
           width: 100%;
-          padding: 12.5px;
+          background: rgba(15, 23, 42, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 10px;
-          border: none;
-          background: linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 50%, #2563eb 100%);
-          background-size: 200% auto;
-          color: white;
-          font-size: 0.94rem;
+          padding: 8px 12px;
+          color: #ffffff;
+          font-size: 0.8rem;
+          outline: none;
+        }
+
+        .styled-select option {
+          background: #0f172a;
+          color: #ffffff;
+        }
+
+        .submit-btn {
+          background: linear-gradient(135deg, #1e3a8a, #2563eb);
+          color: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          padding: 12px;
+          font-size: 0.88rem;
           font-weight: 700;
           cursor: pointer;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 6px 18px rgba(11, 31, 75, 0.28);
-          transition: all 0.25s ease;
+          transition: all 0.2s ease;
+          margin-top: 4px;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
         }
 
         .submit-btn:hover:not(:disabled) {
-          background-position: right center;
-          transform: translateY(-2px);
-          box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          transform: translateY(-1px);
         }
 
-        .submit-btn:active:not(:disabled) {
-          transform: translateY(0) scale(0.99);
+        .citizen-btn {
+          background: linear-gradient(135deg, #0d9488, #059669);
+          box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+        }
+
+        .citizen-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #0f766e, #0d9488);
         }
 
         .submit-btn:disabled {
-          opacity: 0.8;
+          opacity: 0.6;
           cursor: not-allowed;
         }
 
-        .btn-shimmer {
-          position: absolute;
-          top: -50%;
-          left: -60%;
-          width: 40%;
-          height: 200%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
-          transform: rotate(30deg);
-          animation: btnSweep 4s infinite ease-in-out;
-          pointer-events: none;
-        }
-
-        @keyframes btnSweep {
-          0% { left: -60%; }
-          30%, 100% { left: 140%; }
-        }
-
-        .btn-content {
+        .guest-banner {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 8px;
-          position: relative;
-          z-index: 1;
+          justify-content: space-between;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px dashed rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
+          padding: 10px 14px;
+          margin-top: 18px;
+          font-size: 0.76rem;
+          color: #cbd5e1;
         }
 
-        .btn-arrow {
-          transition: transform 0.2s ease;
+        .guest-action-btn {
+          background: none;
+          border: none;
+          color: #f59e0b;
+          font-weight: 700;
+          font-size: 0.76rem;
+          cursor: pointer;
+          text-decoration: underline;
         }
 
-        .submit-btn:hover .btn-arrow {
-          transform: translateX(4px);
-        }
-
-        .btn-loading-content {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          position: relative;
-          z-index: 1;
-        }
-
-        .btn-spinner {
-          display: inline-block;
-          width: 15px;
-          height: 15px;
-          border: 2px solid rgba(255, 255, 255, 0.4);
-          border-top-color: white;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Divider */
         .section-divider {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin: 22px 0 14px;
+          margin: 18px 0;
         }
 
         .divider-line {
           flex: 1;
           height: 1px;
-          background: #e2e8f0;
+          background: rgba(255, 255, 255, 0.1);
         }
 
         .divider-text {
           font-size: 0.68rem;
           font-weight: 700;
-          color: #94a3b8;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          color: #64748b;
+          letter-spacing: 0.04em;
         }
 
-        /* Mini Role Cards */
         .mini-cards-grid {
           display: grid;
-          grid-templateColumns: 1fr 1fr;
-          gap: 9px;
+          grid-template-columns: 1fr;
+          gap: 10px;
         }
 
         .mini-card {
-          background: #f8fafc;
-          border: 1.5px solid #e2e8f0;
-          border-radius: 10px;
-          padding: 8px 10px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          padding: 10px 14px;
           cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          box-sizing: border-box;
-          position: relative;
+          transition: all 0.2s ease;
         }
 
         .mini-card:hover {
-          transform: translateY(-2px);
-          background: #ffffff;
-          border-color: #93c5fd;
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+          border-color: rgba(96, 165, 250, 0.4);
+          background: rgba(30, 58, 138, 0.2);
         }
 
         .mini-card.selected {
-          background: rgba(37, 99, 235, 0.035);
+          background: rgba(30, 58, 138, 0.3);
+          border-color: #3b82f6;
         }
 
         .mini-card-header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
+          align-items: center;
+          margin-bottom: 4px;
         }
 
         .role-pill {
-          font-size: 0.58rem;
-          font-weight: 800;
-          padding: 1.5px 5.5px;
-          border-radius: 99px;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
-          border-width: 1px;
-          border-style: solid;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 6px;
+          border: 1px solid;
         }
 
         .state-pill {
-          font-size: 0.64rem;
-          font-weight: 800;
-          color: #0b1f4b;
-          background: #e2e8f0;
-          padding: 1px 5px;
-          border-radius: 4px;
+          font-size: 0.68rem;
+          color: #94a3b8;
+          font-weight: 600;
         }
 
         .mini-card-name-row {
@@ -988,106 +1101,78 @@ export default function Login() {
         }
 
         .user-name {
-          font-size: 0.78rem;
+          font-size: 0.85rem;
           font-weight: 700;
-          color: #0f172a;
+          color: #ffffff;
         }
 
         .active-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          animation: pulseGlow 1.5s infinite ease-in-out;
         }
 
         .mini-card-creds {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 0.64rem;
-          color: #64748b;
+          gap: 8px;
+          font-family: monospace;
+          font-size: 0.72rem;
+          color: #94a3b8;
+          margin-top: 4px;
         }
 
         .cred-chip {
-          background: #e2e8f0;
-          padding: 1px 4px;
-          border-radius: 3px;
-          color: #1e293b;
-          font-weight: 500;
+          background: rgba(255, 255, 255, 0.06);
+          padding: 1px 6px;
+          border-radius: 4px;
         }
 
         .cred-pass {
-          background: #e2e8f0;
-          padding: 1px 4px;
-          border-radius: 3px;
-          color: #1e293b;
-          font-weight: 700;
+          color: #cbd5e1;
         }
 
         .mini-card-actions {
           display: flex;
-          gap: 4px;
-          margin-top: 3px;
+          gap: 6px;
+          margin-top: 8px;
+          justify-content: flex-end;
         }
 
         .btn-fill {
-          flex: 1;
-          padding: 3.5px 5px;
-          border-radius: 5px;
-          font-size: 0.64rem;
-          font-weight: 600;
-          border: 1px solid #cbd5e1;
-          background: #ffffff;
-          color: #334155;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          color: #cbd5e1;
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 0.72rem;
           cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .btn-fill:hover {
-          background: #f1f5f9;
-          border-color: #94a3b8;
         }
 
         .btn-quick-login {
-          flex: 1.25;
-          padding: 3.5px 5px;
-          border-radius: 5px;
-          font-size: 0.64rem;
+          background: #1e3a8a;
+          border: 1px solid #3b82f6;
+          color: #ffffff;
+          padding: 4px 12px;
+          border-radius: 6px;
+          font-size: 0.72rem;
           font-weight: 700;
-          border: none;
-          background: #0b1f4b;
-          color: white;
           cursor: pointer;
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 2px;
-          transition: all 0.15s ease;
+          gap: 4px;
         }
 
-        .btn-quick-login:hover {
-          background: #1d4ed8;
-          transform: translateY(-0.5px);
-        }
-
-        .mini-arrow {
-          transition: transform 0.15s ease;
-        }
-
-        .btn-quick-login:hover .mini-arrow {
-          transform: translateX(2px);
-        }
-
-        /* Card Footer */
         .card-footer {
-          margin-top: 18px;
+          margin-top: 22px;
+          padding-top: 14px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
           text-align: center;
         }
 
         .footer-seal {
-          font-size: 0.68rem;
-          color: #94a3b8;
-          font-weight: 500;
+          font-size: 0.7rem;
+          color: #64748b;
+          font-weight: 600;
         }
       `}</style>
     </div>

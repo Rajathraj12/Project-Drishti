@@ -41,7 +41,26 @@ export function rolesForPath(pathname: string): Role[] | null {
   return match ? (match.roles as Role[]) : null
 }
 
+const GUEST_ALLOWED_PATTERNS = [
+  '/',
+  '/login',
+  '/dashboard',
+  '/projects',
+  '/projects/:id',
+  '/map',
+  '/contractors',
+  '/contractors/:id',
+  '/contractor/:id',
+  '/report',
+  '/my-reports',
+].map((p) => pathToRegex(p))
+
 export function canAccessPath(role: string | null | undefined, pathname: string): boolean {
+  const path = pathname.split('?')[0]
+  if (path === '/login') return true
+  if (!role) {
+    return GUEST_ALLOWED_PATTERNS.some((regex) => regex.test(path))
+  }
   const normalized = normalizeRole(role)
   if (!normalized) return false
   const allowed = rolesForPath(pathname)
@@ -76,5 +95,14 @@ export const NAV_ITEMS: { label: string; path: string }[] = [
 ]
 
 export function visibleNavItems(role: string | null | undefined) {
+  if (!role) {
+    return [
+      { label: 'Dashboard', path: '/dashboard' },
+      { label: 'Projects', path: '/projects' },
+      { label: 'Map View', path: '/map' },
+      { label: 'Contractors', path: '/contractors' },
+      { label: 'Citizen Report', path: '/report' },
+    ]
+  }
   return NAV_ITEMS.filter((item) => canAccessPath(role, item.path))
 }

@@ -26,11 +26,15 @@ export default function AppShell() {
     navigate("/login")
   }
 
+  const isLoginPage = location.pathname === "/login"
+  const isGuest = !user
   const displayName = user?.first_name
     ? `${user.first_name} ${user.last_name || ''}`.trim()
-    : (user?.username || "Authorized User")
+    : (user?.username || (isGuest ? "Guest Citizen" : "Authorized User"))
 
-  const initials = user?.first_name && user?.last_name
+  const initials = isGuest
+    ? "GC"
+    : user?.first_name && user?.last_name
     ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
     : (user?.username ? user.username.substring(0, 2).toUpperCase() : "AU")
 
@@ -40,7 +44,7 @@ export default function AppShell() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-surface)" }}>
 
-      {isDevBypass && (
+      {!isLoginPage && isDevBypass && (
         <div className="dev-bypass-banner">
           <span>🛠️ DEVELOPMENT MODE — RBAC bypass is active</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -70,54 +74,125 @@ export default function AppShell() {
             <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--color-navy-900)", letterSpacing: "-0.02em", fontFamily: "var(--font-display)" }}>Drishti</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 500 }}>
+          {!isLoginPage && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 500 }}>
               <span className="live-dot" />
               <span style={{ color: "#16a34a", fontWeight: 600 }}>Live</span>
             </div>
 
-            <div className="user-chip" title={`${displayName} (${user?.email || ''}) - ${user?.department || ''}`}>
-              <div className="user-avatar">{initials}</div>
-              <div>
-                <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2 }}>
-                  {displayName}
+            {isGuest ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="user-chip" style={{ background: "rgba(241, 245, 249, 0.8)", borderColor: "#cbd5e1" }}>
+                  <div className="user-avatar" style={{ background: "#2563eb", color: "white" }}>👤</div>
+                  <div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--color-navy-900)", lineHeight: 1.2 }}>
+                      Guest Citizen
+                    </div>
+                    <div style={{ fontSize: "0.62rem", color: "#64748b", fontWeight: 600 }}>
+                      Public Transparency Mode
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: "0.62rem", color: "var(--color-navy-700)", fontWeight: 600, textTransform: "capitalize", letterSpacing: "0.02em" }}>
-                  {user?.role?.replace(/_/g, " ") || "Authorized"}
-                  {user?.department ? ` • ${user.department.split(' - ')[0]}` : ''}
-                </div>
-              </div>
-            </div>
 
-            <button
-              onClick={handleLogout}
-              style={{
-                background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
-                border: "1px solid var(--color-border)", cursor: "pointer",
-                color: "var(--color-text-muted)", padding: "8px", borderRadius: 10,
-                display: "flex", alignItems: "center",
-                transition: "all 0.2s ease", boxShadow: "0 1px 4px rgba(26,48,104,0.06)",
-              }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = "var(--color-risk-high-bg)"
-                el.style.color = "var(--color-risk-high)"
-                el.style.borderColor = "var(--color-risk-high-border)"
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = "rgba(255,255,255,0.85)"
-                el.style.color = "var(--color-text-muted)"
-                el.style.borderColor = "var(--color-border)"
-              }}
-              title="Sign out"
-            >
-              <LogOutIcon style={{ width: 15, height: 15 }} />
-            </button>
+                <button
+                  onClick={() => navigate("/login?tab=citizen")}
+                  style={{
+                    background: "#1e3a8a",
+                    color: "white",
+                    border: "none",
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    fontSize: "0.76rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    boxShadow: "0 2px 6px rgba(30, 58, 138, 0.2)",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#1d4ed8")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "#1e3a8a")}
+                  title="Citizen Sign In or Register"
+                >
+                  <span>🏛️</span> Citizen Sign In
+                </button>
+
+                <button
+                  onClick={() => navigate("/login?tab=officer")}
+                  style={{
+                    background: "white",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    padding: "7px 12px",
+                    borderRadius: 8,
+                    fontSize: "0.74rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = "#94a3b8"
+                    e.currentTarget.style.background = "#f8fafc"
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = "#cbd5e1"
+                    e.currentTarget.style.background = "white"
+                  }}
+                  title="Government / Ministry Official Login"
+                >
+                  Official Login
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="user-chip" title={`${displayName} (${user?.email || ''}) - ${user?.department || ''}`}>
+                  <div className="user-avatar">{initials}</div>
+                  <div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2 }}>
+                      {displayName}
+                    </div>
+                    <div style={{ fontSize: "0.62rem", color: "var(--color-navy-700)", fontWeight: 600, textTransform: "capitalize", letterSpacing: "0.02em" }}>
+                      {user?.role?.replace(/_/g, " ") || "Authorized"}
+                      {user?.department ? ` • ${user.department.split(' - ')[0]}` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)",
+                    border: "1px solid var(--color-border)", cursor: "pointer",
+                    color: "var(--color-text-muted)", padding: "8px", borderRadius: 10,
+                    display: "flex", alignItems: "center",
+                    transition: "all 0.2s ease", boxShadow: "0 1px 4px rgba(26,48,104,0.06)",
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLElement
+                    el.style.background = "var(--color-risk-high-bg)"
+                    el.style.color = "var(--color-risk-high)"
+                    el.style.borderColor = "var(--color-risk-high-border)"
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLElement
+                    el.style.background = "rgba(255,255,255,0.85)"
+                    el.style.color = "var(--color-text-muted)"
+                    el.style.borderColor = "var(--color-border)"
+                  }}
+                  title="Sign out"
+                >
+                  <LogOutIcon style={{ width: 15, height: 15 }} />
+                </button>
+              </>
+            )}
           </div>
+          )}
         </div>
       </div>
 
+      {!isLoginPage && (
       <div className="gov-navbar" style={{ flexShrink: 0, height: 46, display: "flex", alignItems: "center", padding: "0 28px" }}>
         {/* Home link — always first */}
         <button
@@ -150,6 +225,7 @@ export default function AppShell() {
           )
         })}
       </div>
+      )}
 
       <main style={{ flex: 1, overflowY: "auto", position: "relative" }}>
         {loading ? (

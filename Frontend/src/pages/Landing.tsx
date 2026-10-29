@@ -1179,7 +1179,7 @@ export default function Landing() {
             {/* Projects access button */}
             <button
               id="landing-reports-btn"
-              onClick={() => navigate(isAuthenticated ? "/projects" : "/login")}
+              onClick={() => navigate("/projects")}
               style={{
                 background: "rgba(255, 255, 255, 0.85)",
                 border: "1.5px solid rgba(203, 213, 225, 0.85)",
@@ -1220,7 +1220,7 @@ export default function Landing() {
             {/* Primary Action Button */}
             <button
               id="landing-dashboard-btn"
-              onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+              onClick={() => navigate("/dashboard")}
               style={{
                 background: "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)",
                 color: C.white,
@@ -1409,7 +1409,7 @@ export default function Landing() {
             {/* Mobile CTA */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
-                onClick={() => { navigate(isAuthenticated ? "/projects" : "/login"); setMobileOpen(false) }}
+                onClick={() => { navigate("/projects"); setMobileOpen(false) }}
                 style={{
                   width: "100%", background: "#eff6ff", color: "#1d4ed8",
                   border: "1px solid #bfdbfe", borderRadius: 10, padding: "11px 16px",
@@ -1423,7 +1423,7 @@ export default function Landing() {
               </button>
 
               <button
-                onClick={() => { navigate(isAuthenticated ? "/dashboard" : "/login"); setMobileOpen(false) }}
+                onClick={() => { navigate("/dashboard"); setMobileOpen(false) }}
                 style={{
                   width: "100%", background: "linear-gradient(135deg, #0b1f4b 0%, #1e3a8a 100%)",
                   color: C.white, border: "none", borderRadius: 10, padding: "12px 16px",
@@ -1530,7 +1530,7 @@ export default function Landing() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
               <button
                 id="hero-dashboard-btn"
-                onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+                onClick={() => navigate("/dashboard")}
                 style={{
                   background: C.amber, color: C.navy900,
                   border: "none", padding: "13px 28px", borderRadius: 8,
@@ -2340,7 +2340,7 @@ export default function Landing() {
                 return (
                   <article
                     key={p.project_id}
-                    onClick={() => isAuthenticated ? navigate(`/projects/${p.project_id}`) : navigate("/login")}
+                    onClick={() => navigate(`/projects/${p.project_id}`)}
                     style={{
                       border: `1px solid ${C.border}`,
                       borderRadius: 12,
@@ -2539,7 +2539,7 @@ export default function Landing() {
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               <button
                 id="editorial-dashboard-btn"
-                onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
+                onClick={() => navigate("/dashboard")}
                 style={{
                   background: C.amber, color: C.navy900,
                   border: "none", padding: "11px 22px", borderRadius: 8,
@@ -2703,10 +2703,10 @@ export default function Landing() {
                 Platform
               </div>
               {[
-                { label: "Dashboard", action: () => navigate(isAuthenticated ? "/dashboard" : "/login") },
-                { label: "Projects", action: () => navigate(isAuthenticated ? "/projects" : "/login") },
-                { label: "Contractors", action: () => navigate(isAuthenticated ? "/contractors" : "/login") },
-                { label: "Map View", action: () => navigate(isAuthenticated ? "/map" : "/login") },
+                { label: "Dashboard", action: () => navigate("/dashboard") },
+                { label: "Projects", action: () => navigate("/projects") },
+                { label: "Contractors", action: () => navigate("/contractors") },
+                { label: "Map View", action: () => navigate("/map") },
               ].map(l => (
                 <button
                   key={l.label}

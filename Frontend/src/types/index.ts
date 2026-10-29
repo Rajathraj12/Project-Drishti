@@ -98,6 +98,7 @@ export interface Project {
   anomaly_flag?: boolean | null;
   anomaly_status?: string;
   ml_explanation?: string | null;
+  inspection_checklist?: Record<string, boolean>;
 }
 
 export interface Milestone {

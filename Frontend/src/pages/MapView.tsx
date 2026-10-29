@@ -125,8 +125,8 @@ const STATE_CENTERS: Record<string, { lat: number; lng: number }> = {
 }
 
 const riskColor = (r: number) =>
-  r >= 70 ? { bg: "#DC2626", light: "#FEE2E2", border: "#DC2626" } :
-    r >= 50 ? { bg: "#D97706", light: "#FEF3C7", border: "#D97706" } :
+  r >= 60 ? { bg: "#DC2626", light: "#FEE2E2", border: "#DC2626" } :
+    r >= 35 ? { bg: "#D97706", light: "#FEF3C7", border: "#D97706" } :
       { bg: "#16A34A", light: "#DCFCE7", border: "#16A34A" }
 
 // Smooth map controller for flying to selected project and fitting bounds by state
@@ -216,7 +216,7 @@ export default function MapView() {
           ? p.risk_score
           : (p.reported_progress < 40 ? 75 : p.reported_progress < 70 ? 55 : 30)
 
-        const status = risk >= 70 ? "High Risk" : risk >= 50 ? "Medium Risk" : "Low Risk"
+        const status = risk >= 60 ? "High Risk" : risk >= 35 ? "Medium Risk" : "Low Risk"
 
         return {
           id: p.project_id,
@@ -239,9 +239,9 @@ export default function MapView() {
   }, [])
 
   const filtered = markers.filter((m: Marker) => {
-    if (filters.risk === "high" && m.risk < 70) return false
-    if (filters.risk === "medium" && (m.risk < 50 || m.risk >= 70)) return false
-    if (filters.risk === "low" && m.risk >= 50) return false
+    if (filters.risk === "high" && m.risk < 60) return false
+    if (filters.risk === "medium" && (m.risk < 35 || m.risk >= 60)) return false
+    if (filters.risk === "low" && m.risk >= 35) return false
     if (filters.state !== "All States" && m.location !== filters.state) return false
     if (filters.sector !== "All Types" && m.sector !== filters.sector) return false
     return true
@@ -348,9 +348,9 @@ export default function MapView() {
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Risk Legend</div>
           <div className="space-y-1.5">
             {[
-              { color: "#DC2626", label: "High Risk (≥70)" },
-              { color: "#D97706", label: "Medium Risk (50–69)" },
-              { color: "#16A34A", label: "Low Risk (<50)" },
+              { color: "#DC2626", label: "High Risk (≥60)" },
+              { color: "#D97706", label: "Medium Risk (35–59)" },
+              { color: "#16A34A", label: "Low Risk (<35)" },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: l.color }}></div>
@@ -522,9 +522,9 @@ export default function MapView() {
             </div>
             <div style={{ display: "flex", gap: 14 }}>
               {[
-                { color: "#DC2626", count: markers.filter(m => m.risk >= 70).length, label: "High" },
-                { color: "#D97706", count: markers.filter(m => m.risk >= 50 && m.risk < 70).length, label: "Medium" },
-                { color: "#16A34A", count: markers.filter(m => m.risk < 50).length, label: "Low" },
+                { color: "#DC2626", count: markers.filter(m => m.risk >= 60).length, label: "High" },
+                { color: "#D97706", count: markers.filter(m => m.risk >= 35 && m.risk < 60).length, label: "Medium" },
+                { color: "#16A34A", count: markers.filter(m => m.risk < 35).length, label: "Low" },
               ].map(s => (
                 <div key={s.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.6)", borderRadius: 10, padding: "8px 12px", border: "1px solid rgba(220,232,245,0.6)" }}>
                   <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, boxShadow: `0 0 8px ${s.color}80` }} />

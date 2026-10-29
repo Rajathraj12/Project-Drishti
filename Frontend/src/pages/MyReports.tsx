@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
 import { citizenReportService, CitizenReportItem } from "../services/citizenReportService"
 
 type ReportStatus = "Submitted" | "Under Review" | "Verified" | "Resolved" | "Closed" | "Dismissed"
@@ -205,6 +206,7 @@ function ReportCard({ report }: { report: CitizenReportRecord }) {
 
 export default function MyReports() {
   const navigate = useNavigate()
+  const { user, isGuest } = useAuth()
   const [reports, setReports] = useState<CitizenReportRecord[]>([])
   const [filter, setFilter] = useState<"All" | ReportStatus>("All")
 

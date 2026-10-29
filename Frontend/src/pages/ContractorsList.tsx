@@ -237,8 +237,9 @@ export default function ContractorsList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContractors.map((c) => {
-            const isHighRisk = c.avgRisk >= 70
-            const isMediumRisk = c.avgRisk >= 50 && c.avgRisk < 70
+            const isNoProjects = c.totalProjects === 0
+            const isHighRisk = !isNoProjects && c.avgRisk >= 60
+            const isMediumRisk = !isNoProjects && c.avgRisk >= 35 && c.avgRisk < 60
 
             return (
               <div
@@ -254,6 +255,9 @@ export default function ContractorsList() {
                         <span className="text-[11px] font-mono font-bold text-navy-600 bg-navy-50 px-2 py-0.5 rounded">
                           {c.id}
                         </span>
+                        <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded" title="Institutional Credit & Track Record Rating">
+                          {c.creditRating}
+                        </span>
                         <span className="text-[11px] text-slate-400 font-mono">
                           {c.headquarters.split(",")[0]}
                         </span>
@@ -267,17 +271,19 @@ export default function ContractorsList() {
                     {/* Risk Circle */}
                     <div
                       className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl flex-shrink-0 font-bold border transition ${
-                        isHighRisk
+                        isNoProjects
+                          ? "bg-slate-50 text-slate-400 border-slate-200"
+                          : isHighRisk
                           ? "bg-red-50 text-red-700 border-red-200"
                           : isMediumRisk
                           ? "bg-amber-50 text-amber-700 border-amber-200"
                           : "bg-emerald-50 text-emerald-700 border-emerald-200"
                       }`}
-                      title={`Risk Score: ${c.avgRisk}/100 (${c.riskLevel})`}
+                      title={isNoProjects ? "No projects in active scope" : `Risk Score: ${c.avgRisk}/100 (${c.riskLevel})`}
                     >
-                      <span className="font-mono text-base leading-none">{c.avgRisk}</span>
+                      <span className="font-mono text-base leading-none">{isNoProjects ? "—" : c.avgRisk}</span>
                       <span className="text-[9px] uppercase tracking-wider font-semibold mt-0.5">
-                        {c.riskLevel}
+                        {isNoProjects ? "N/A" : c.riskLevel}
                       </span>
                     </div>
                   </div>

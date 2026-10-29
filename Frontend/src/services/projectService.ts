@@ -24,19 +24,38 @@ export const projectService = {
   },
 
   /**
-   * Future implementation: GET /api/projects/{id}
+   * GET /api/projects/{id}
    */
   async getProjectDetails(id: string): Promise<Project> {
     return fetchApi<Project>(`/projects/${id}/`);
   },
 
   /**
-   * Future implementation: PATCH /api/projects/{id}
+   * POST /api/projects/ - Create project in MongoDB Atlas
+   */
+  async createProject(projectData: Partial<Project>): Promise<Project> {
+    return fetchApi<Project>('/projects/', {
+      method: 'POST',
+      body: JSON.stringify(projectData),
+    });
+  },
+
+  /**
+   * PATCH /api/projects/{id} - Update project in MongoDB Atlas
    */
   async updateProject(id: string, updates: Partial<Project>): Promise<Project> {
     return fetchApi<Project>(`/projects/${id}/`, {
       method: 'PATCH',
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
+    });
+  },
+
+  /**
+   * DELETE /api/projects/{id} - Delete project from MongoDB Atlas
+   */
+  async deleteProject(id: string): Promise<{ message: string; project_id?: string }> {
+    return fetchApi<{ message: string; project_id?: string }>(`/projects/${id}/`, {
+      method: 'DELETE',
     });
   },
 
@@ -85,5 +104,23 @@ export const projectService = {
 
   async getVerifications(id: string): Promise<any[]> {
     return fetchApi<any[]>(`/projects/${id}/verifications/`, { method: 'GET' });
+  },
+
+  /**
+   * Section 65B Inspection Checklist (persisted in MongoDB Atlas)
+   */
+  async getChecklists(): Promise<Record<string, Record<string, boolean>>> {
+    return fetchApi<Record<string, Record<string, boolean>>>(`/projects/checklists/`, { method: 'GET' });
+  },
+
+  async getProjectChecklist(id: string): Promise<{ project_id: string; checked_items: Record<string, boolean> }> {
+    return fetchApi<{ project_id: string; checked_items: Record<string, boolean> }>(`/projects/${id}/checklist/`, { method: 'GET' });
+  },
+
+  async saveChecklist(id: string, checkedItems: Record<string, boolean>): Promise<any> {
+    return fetchApi<any>(`/projects/${id}/checklist/`, {
+      method: 'POST',
+      body: JSON.stringify({ checked_items: checkedItems })
+    });
   }
 };

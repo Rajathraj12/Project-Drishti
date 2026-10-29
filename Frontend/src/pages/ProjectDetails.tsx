@@ -119,6 +119,7 @@ export default function ProjectDetails() {
   const [actionAssignee, setActionAssignee] = useState("")
   const [actionAgency, setActionAgency] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
+  const [showCalculationModal, setShowCalculationModal] = useState(false)
 
   const fetchAssessments = () => {
     if (!id) return;
@@ -249,7 +250,7 @@ export default function ProjectDetails() {
           <div className="text-4xl mb-3">🛡️</div>
           <h2 className="text-lg font-bold text-navy-900 mb-2">Project Inaccessible or Outside Jurisdiction</h2>
           <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-[550px] mx-auto">
-            Project <span className="font-mono font-bold text-navy-800">#{id}</span> is not accessible under your current active role (<strong>{user?.role?.replace(/_/g, " ") || "Officer"}</strong>).
+            Project <span className="font-mono font-bold text-navy-800">#{id}</span> is not accessible under your current active role (<strong>{user ? (user.role?.replace(/_/g, " ") || "Authorized User") : "Guest Citizen"}</strong>).
             {user?.state && <span> Your jurisdictional scope is limited to <strong>{user.state}</strong> infrastructure records.</span>}
           </p>
           <div className="flex justify-center gap-3">
@@ -272,7 +273,10 @@ export default function ProjectDetails() {
   }
 
   // Derive Unified Risk State
-  const ruleFlag = (analysisResult?.risk_score ?? 0) >= 40;
+  const ruleFlag = analysisResult?.risk_level === 'High' || 
+                   analysisResult?.risk_level === 'Medium' || 
+                   analysisResult?.risk_level === 'Critical' || 
+                   (analysisResult?.risk_score ?? 0) >= 35;
   const mlFlag = mlAssessment?.anomaly_flag === true;
   let unifiedState = "Neither Flagged";
   let statePillStyle = "bg-emerald-50 text-emerald-800 border-emerald-200";
@@ -342,16 +346,26 @@ export default function ProjectDetails() {
               <span className="font-bold border px-2 py-0.5 rounded">Status: {project.verification_status}</span>
             </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {canAnalyze && (
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
             <button
-              onClick={handleAnalyze}
-              disabled={analysisLoading}
-              className={`text-sm border border-slate-200 text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-50 font-500 transition-colors ${analysisLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => setShowCalculationModal(true)}
+              className="text-sm border border-sky-300 bg-sky-50 text-sky-800 px-3.5 py-2 rounded-lg hover:bg-sky-100 font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              {analysisLoading ? "Running Risk & ML Engine..." : "Trigger Full Analysis"}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <rect x="4" y="2" width="16" height="20" rx="2" />
+                <line x1="8" y1="6" x2="16" y2="6" />
+                <line x1="16" y1="14" x2="16" y2="18" />
+                <path d="M16 10h.01" />
+                <path d="M12 10h.01" />
+                <path d="M8 10h.01" />
+                <path d="M12 14h.01" />
+                <path d="M8 14h.01" />
+                <path d="M12 18h.01" />
+                <path d="M8 18h.01" />
+              </svg>
+              <span>How It's Calculated</span>
             </button>
-            )}
+
             {canViewEvidence && (
             <button
               onClick={() => navigate(`/evidence?projectId=${id}`)}
@@ -400,17 +414,30 @@ export default function ProjectDetails() {
               Sanctioned allocations, approved revisions, cumulative expenditure, and delivery velocity tracking.
             </p>
           </div>
-          {project.source_url && (
-            <a
-              href={project.source_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-600 text-navy-700 hover:text-navy-900 bg-navy-50 hover:bg-navy-100 px-3 py-1.5 rounded-lg border border-navy-200 transition flex items-center gap-1.5 w-fit"
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowCalculationModal(true)}
+              className="text-xs font-bold text-sky-800 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-lg border border-sky-200 transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>📄 View MoSPI PAIMANA Flash Report</span>
-              <span>↗</span>
-            </a>
-          )}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+              <span>Calculation Formulas</span>
+            </button>
+            {project.source_url && (
+              <a
+                href={project.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-600 text-navy-700 hover:text-navy-900 bg-navy-50 hover:bg-navy-100 px-3 py-1.5 rounded-lg border border-navy-200 transition flex items-center gap-1.5 w-fit"
+              >
+                <span>📄 View MoSPI PAIMANA Flash Report</span>
+                <span>↗</span>
+              </a>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -576,8 +603,8 @@ export default function ProjectDetails() {
                           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Risk Score</div>
                           <div className="flex items-baseline gap-1 mt-0.5">
                             <span className={`text-3xl font-display font-900 ${
-                              analysisResult.risk_score >= 70 ? "text-red-700" :
-                              analysisResult.risk_score >= 40 ? "text-amber-700" :
+                              analysisResult.risk_score >= 60 ? "text-red-700" :
+                              analysisResult.risk_score >= 35 ? "text-amber-700" :
                               "text-emerald-700"
                             }`}>
                               {analysisResult.risk_score}
@@ -599,8 +626,8 @@ export default function ProjectDetails() {
                       <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden mt-2">
                         <div
                           className={`h-2 rounded-full transition-all duration-700 ${
-                            analysisResult.risk_score >= 70 ? "bg-red-600" :
-                            analysisResult.risk_score >= 40 ? "bg-amber-500" :
+                            analysisResult.risk_score >= 60 ? "bg-red-600" :
+                            analysisResult.risk_score >= 35 ? "bg-amber-500" :
                             "bg-emerald-600"
                           }`}
                           style={{ width: `${Math.min(100, analysisResult.risk_score)}%` }}
@@ -608,7 +635,8 @@ export default function ProjectDetails() {
                       </div>
                       <div className="flex justify-between text-[10px] text-slate-400 mt-1.5 font-mono">
                         <span>0 (Nominal)</span>
-                        <span>40 (Threshold)</span>
+                        <span>35 (Medium)</span>
+                        <span>60 (High)</span>
                         <span>100 (Critical)</span>
                       </div>
                     </div>
@@ -952,6 +980,205 @@ export default function ProjectDetails() {
         )}
       </div>
       )}
+
+
+      {/* CALCULATION METHODOLOGY BREAKDOWN MODAL */}
+      {showCalculationModal && project && (() => {
+        const origCost = Number(project.original_cost_cr ?? project.original_cost) || 0;
+        const revCost = Number(project.revised_cost_cr ?? project.revised_cost ?? origCost) || origCost;
+        const expCost = Number(project.expenditure_cr ?? project.expenditure) || 0;
+        const reportedProg = Number(project.reported_progress_pct ?? project.reported_progress) || 0;
+        const overrunVal = project.cost_overrun_cr != null ? Number(project.cost_overrun_cr) : Math.max(0, revCost - origCost);
+        const costDevVal = project.cost_deviation_pct != null ? Number(project.cost_deviation_pct) : (origCost > 0 ? ((revCost - origCost) / origCost) * 100 : 0);
+        const unspentVal = Math.max(0, revCost - expCost);
+        const utilizationVal = project.financial_utilization_pct != null ? Number(project.financial_utilization_pct) : (revCost > 0 ? (expCost / revCost) * 100 : 0);
+        const velocityVal = reportedProg > 0 ? Number((utilizationVal / reportedProg).toFixed(2)) : 1.0;
+        const gapVal = Number((utilizationVal - reportedProg).toFixed(1));
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-3xl p-6 shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-sky-100 text-sky-700 rounded-lg">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <rect x="4" y="2" width="16" height="20" rx="2" />
+                        <line x1="8" y1="6" x2="16" y2="6" />
+                        <line x1="16" y1="14" x2="16" y2="18" />
+                        <path d="M16 10h.01" />
+                        <path d="M12 10h.01" />
+                        <path d="M8 10h.01" />
+                        <path d="M12 14h.01" />
+                        <path d="M8 14h.01" />
+                        <path d="M12 18h.01" />
+                        <path d="M8 18h.01" />
+                      </svg>
+                    </span>
+                    <h2 className="text-base font-bold text-[#0b1f4b]">
+                      Financial & Progress Metric Calculation Breakdown
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Step-by-step mathematical derivation for Project <strong>#{project.project_id}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCalculationModal(false)}
+                  className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Base Variables Section */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 mb-5">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                  Base Project Allocation & Expenditure Data
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[10px] uppercase font-bold">Original Sanction (O)</div>
+                    <div className="font-mono font-bold text-sm text-[#0b1f4b] mt-0.5">
+                      {formatCostCr(origCost)}
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[10px] uppercase font-bold">Revised Cost (R)</div>
+                    <div className="font-mono font-bold text-sm text-[#0b1f4b] mt-0.5">
+                      {formatCostCr(revCost)}
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[10px] uppercase font-bold">Cumulative Spent (E)</div>
+                    <div className="font-mono font-bold text-sm text-[#0b1f4b] mt-0.5">
+                      {formatCostCr(expCost)}
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <div className="text-slate-400 text-[10px] uppercase font-bold">Physical Progress (P)</div>
+                    <div className="font-mono font-bold text-sm text-sky-700 mt-0.5">
+                      {reportedProg}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step-by-Step Calculations */}
+              <div className="space-y-3.5 text-xs">
+                {/* 1. Cost Overrun */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">1. Cost Overrun (Escalation)</span>
+                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+                      {overrunVal > 0 ? `+${formatCostCr(overrunVal)}` : "None (Within Budget)"}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Cost Overrun = Revised Cost (R) − Original Sanction (O)
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">{formatCostCr(revCost)} − {formatCostCr(origCost)} = {overrunVal > 0 ? `+${formatCostCr(overrunVal)}` : "₹0.00 Cr"}</span>. Represents the absolute budget expansion approved beyond original cabinet sanction.
+                  </p>
+                </div>
+
+                {/* 2. Deviation from Original */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">2. Deviation from Original Sanction</span>
+                    <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200">
+                      {costDevVal.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Deviation % = ((Revised Cost (R) − Original Sanction (O)) ÷ Original Sanction (O)) × 100
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">({formatCostCr(overrunVal)} ÷ {formatCostCr(origCost)}) × 100 = {costDevVal.toFixed(2)}%</span>. Measures relative cost growth over baseline.
+                  </p>
+                </div>
+
+                {/* 3. Unspent Balance */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">3. Unspent Budget Balance</span>
+                    <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                      {formatCostCr(unspentVal)}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Unspent Balance = Revised Cost (R) − Cumulative Expenditure (E)
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">{formatCostCr(revCost)} − {formatCostCr(expCost)} = {formatCostCr(unspentVal)}</span>. Remaining unencumbered liquid funds available for forthcoming construction tranches.
+                  </p>
+                </div>
+
+                {/* 4. Budget Utilization Rate */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">4. Budget Utilization Rate (Financial Burn)</span>
+                    <span className="font-mono font-bold text-navy-800 bg-sky-50 px-2.5 py-0.5 rounded border border-sky-200">
+                      {utilizationVal.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Utilization Rate % = (Cumulative Expenditure (E) ÷ Revised Cost (R)) × 100
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">({formatCostCr(expCost)} ÷ {formatCostCr(revCost)}) × 100 = {utilizationVal.toFixed(1)}%</span>. The percentage of total sanctioned funds disbursed to contractors to date.
+                  </p>
+                </div>
+
+                {/* 5. Spend-to-Progress Velocity Ratio */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">5. Spend-to-Progress Velocity Ratio</span>
+                    <span className={`font-mono font-bold px-2.5 py-0.5 rounded border ${velocityVal > 1.0 ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-emerald-800 bg-emerald-50 border-emerald-200'}`}>
+                      {velocityVal.toFixed(2)}x
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Velocity = Budget Utilization Rate % ÷ Reported Physical Progress % (P)
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">{utilizationVal.toFixed(1)}% ÷ {reportedProg}% = {velocityVal.toFixed(2)}x</span>. A velocity ratio of <strong className="text-slate-700">1.0x</strong> indicates parity between money spent and physical progress. Ratios <strong className="text-amber-700">&gt; 1.0x</strong> signify that treasury disbursements are outpacing physical structures verified on site.
+                  </p>
+                </div>
+
+                {/* 6. Physical vs Financial Gap */}
+                <div className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors bg-white">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-sm">6. Physical vs Financial Divergence Gap</span>
+                    <span className={`font-mono font-bold px-2.5 py-0.5 rounded border ${gapVal > 15 ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-slate-800 bg-slate-100 border-slate-200'}`}>
+                      {gapVal > 0 ? `+${gapVal}%` : `${gapVal}%`}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
+                    Formula: Divergence Gap % = Budget Utilization Rate % − Reported Physical Progress % (P)
+                  </div>
+                  <p className="text-slate-500 text-[11px] mt-1.5 leading-relaxed">
+                    Calculation: <span className="font-mono font-semibold text-slate-700">{utilizationVal.toFixed(1)}% − {reportedProg}% = {gapVal > 0 ? `+${gapVal}%` : `${gapVal}%`}</span>. Divergence exceeding 15% automatically flags the site for independent Section 65B physical ground corroboration.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-end text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowCalculationModal(false)}
+                  className="px-4 py-2 bg-[#0b1f4b] hover:bg-[#152e6d] text-white rounded-lg font-bold shadow-xs cursor-pointer"
+                >
+                  Close Breakdown
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
 
       {/* Action Creation Modal */}
       {showActionModal && canCreateActions && (

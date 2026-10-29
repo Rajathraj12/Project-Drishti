@@ -4,7 +4,6 @@ import { projectService } from "../services/projectService";
 import { Project } from "../types";
 
 type Tab = "all" | "photos" | "inspections" | "documents" | "remote";
-type ViewTab = "desk" | "report";
 
 interface EvidenceItem {
   id: string;
@@ -41,14 +40,13 @@ export default function Evidence() {
   const [loadingProjects, setLoadingProjects] = useState(true);
 
   const [activeTab, setActiveTab] = useState<Tab>("all");
-  const [viewTab, setViewTab] = useState<ViewTab>("report");
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState<number>(4);
   const [showGhostGrid, setShowGhostGrid] = useState(false);
   const [matchPercentage, setMatchPercentage] = useState(54.2);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sliderPos, setSliderPos] = useState(50);
   const [comparisonMode, setComparisonMode] = useState<"side-by-side" | "slider">("side-by-side");
   const [dragging, setDragging] = useState(false);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<number>(4);
 
   // Modals state
   const [modalType, setModalType] = useState<string | null>(null);
@@ -170,6 +168,13 @@ export default function Evidence() {
     },
   ], [currentProject, claimedProgress, auditedProgress, progressGap, invoicedTrancheCr, unverifiedGapCr]);
 
+  // Dynamic voucher amount in INR formatted using standard Indian numbering system (e.g. ₹39,07,20,000)
+  const voucherAmountVal = Math.max(
+    100000,
+    (Math.round(Number(unverifiedGapCr) * 10) || 3907) * 100000 + 20000
+  );
+  const formattedVoucherAmount = `₹${voucherAmountVal.toLocaleString("en-IN")}`;
+
   // Change project handler
   const handleSelectProject = (id: string) => {
     setSelectedProjectId(id);
@@ -256,7 +261,7 @@ export default function Evidence() {
       status: "Verified",
       statusColor: "green",
       voucherData: {
-        amount: `₹${(Number(unverifiedGapCr) * 10).toFixed(0)},20,000`,
+        amount: formattedVoucherAmount,
         ref: `Treasury Direct Debit JKA-TR-9021 · ${currentProject.project_id}`,
         subTags: ["GSTIN Corroborated", "Bank Reference Matched"],
       },
@@ -315,31 +320,6 @@ export default function Evidence() {
 
   return (
     <div className="bg-[#f0f4f9] min-h-screen text-slate-800 font-sans pb-16">
-      {/* Top Breadcrumb Bar */}
-      <div className="bg-[#0b1f4b] text-white px-6 py-2.5 flex flex-wrap items-center justify-between text-xs border-b border-navy-800 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-white/60 cursor-pointer hover:underline" onClick={() => navigate("/dashboard")}>
-            Home
-          </span>
-          <span className="text-white/40">›</span>
-          <span className="text-white/60">Oversight Operations</span>
-          <span className="text-white/40">›</span>
-          <span className="text-white font-semibold">Evidence Desk</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="bg-sky-500/20 text-sky-300 px-2.5 py-0.5 rounded font-mono font-medium border border-sky-400/30">
-            EVIDENTIARY GRID v2.4
-          </span>
-          <span className="bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded font-mono font-bold border border-amber-400/30">
-            DOSSIER: {currentProject.project_id}
-          </span>
-          <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>NIC Certified Section 65B</span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Header & Dossier Selector */}
       <div className="max-w-[1440px] mx-auto px-6 pt-5 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -419,55 +399,16 @@ export default function Evidence() {
               </svg>
               <span>Upload Evidence</span>
             </button>
-          </div>
-        </div>
 
-        {/* Mode Switcher: Visual Desk vs Plain-English Executive Report */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 bg-white p-2 rounded-xl border border-slate-200/90 shadow-xs">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewTab("desk")}
-              className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
-                viewTab === "desk"
-                  ? "bg-[#0b1f4b] text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="12" y1="3" x2="12" y2="21" />
-              </svg>
-              <span>Interactive Verification Desk</span>
-            </button>
-
-            <button
-              onClick={() => setViewTab("report")}
-              className={`px-4 py-2 rounded-lg text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
-                viewTab === "report"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-              }`}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              <span>Easy-to-Understand Audit Report (Plain-English Brief)</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
+            {/* Export Signed PDF */}
             <button
               onClick={() => {
                 setModalType("export");
                 setModalData(currentProject);
               }}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold px-3.5 py-2 rounded-lg text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
@@ -477,633 +418,232 @@ export default function Evidence() {
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* VIEW 1: EASY-TO-UNDERSTAND EXECUTIVE REPORT                  */}
-        {/* ============================================================ */}
-        {viewTab === "report" && (
-          <div className="mt-5 space-y-6 animate-in fade-in duration-200">
-            {/* Visual Audit Checkpoint Track */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-slate-100">
+        {/* INTERACTIVE VISUAL VERIFICATION DESK */}
+        <div className="mt-4 animate-in fade-in duration-200">
+            {/* Statutory Audit Pipeline — Horizontal Stepper */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs mb-5 overflow-hidden">
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-100">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                    <h3 className="text-sm font-black text-[#0b1f4b] uppercase tracking-wider">
-                      Statutory Audit Checkpoint Track — {currentProject.project_id}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Click any checkpoint along the audit trail to inspect verified ground evidence and timestamps.
-                  </p>
+                  <div className="text-xs font-bold text-[#0b1f4b] tracking-wide uppercase">Statutory Audit Checkpoint Trail</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">Section 65B · Sequential compliance pipeline · {currentProject.project_id}</div>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 font-medium">Pipeline Status:</span>
-                  <span className="bg-rose-100 text-rose-800 border border-rose-300 font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
-                    <span>🛑</span> Checkpoint 04 Failed · Payment Blocked at Checkpoint 05
-                  </span>
-                </div>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  Stage 4 Anomaly · Payment Held
+                </span>
               </div>
 
-              {/* Connecting Pipeline Stepper */}
-              <div className="relative">
-                {/* Horizontal connection line behind nodes */}
-                <div className="hidden md:block absolute top-[28px] left-[10%] right-[10%] h-[4px] bg-slate-200 z-0">
-                  {/* Passed track up to CP-3 */}
-                  <div className="h-full bg-emerald-500 w-[50%]" />
-                  {/* Alert track from CP-3 to CP-4 */}
-                  <div className="absolute top-0 left-[50%] w-[25%] h-full bg-gradient-to-r from-emerald-500 to-rose-500" />
-                  {/* Blocked track from CP-4 to CP-5 */}
-                  <div className="absolute top-0 left-[75%] w-[25%] h-full border-t-2 border-dashed border-rose-400 bg-transparent" />
-                </div>
+              {/* Stepper */}
+              <div className="px-6 py-5">
+                <div className="relative flex items-start">
+                  {/* Connector line behind nodes */}
+                  <div className="absolute left-0 right-0 top-[18px] h-px bg-slate-200 z-0 mx-[10%]">
+                    <div className="h-full bg-emerald-400" style={{ width: "50%" }} />
+                  </div>
 
-                {/* The 5 Checkpoint Nodes */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 relative z-10">
                   {checkpoints.map((cp, idx) => {
                     const isSelected = selectedCheckpoint === idx + 1;
+                    const isPassed = cp.status.includes("PASSED");
+                    const isFailed = cp.status.includes("FLAGGED");
+                    const isHeld = cp.status.includes("HELD");
+
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={cp.id}
                         onClick={() => setSelectedCheckpoint(idx + 1)}
-                        className={`p-3.5 rounded-xl border transition-all text-center cursor-pointer ${
-                          isSelected
-                            ? "bg-slate-50 border-[#0b1f4b] shadow-md ring-2 ring-[#0b1f4b]/20"
-                            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs"
-                        }`}
+                        className="flex-1 flex flex-col items-center gap-2 relative z-10 cursor-pointer group"
                       >
-                        {/* Circular badge */}
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm shadow-md border-4 border-white mx-auto mb-2 transition-transform duration-200 ${
-                            isSelected ? "scale-110" : ""
-                          } ${
-                            cp.statusColor === "emerald"
-                              ? "bg-emerald-600 text-white"
-                              : cp.statusColor === "sky"
-                              ? "bg-sky-600 text-white"
-                              : cp.statusColor === "rose"
-                              ? "bg-rose-600 text-white animate-pulse"
-                              : "bg-[#0b1f4b] text-rose-300"
-                          }`}
-                        >
-                          {cp.icon}
+                        {/* Node */}
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${
+                          isSelected
+                            ? "bg-[#0b1f4b] border-[#0b1f4b] shadow-md"
+                            : isPassed
+                            ? "bg-emerald-500 border-emerald-500 group-hover:border-emerald-600"
+                            : isFailed
+                            ? "bg-rose-500 border-rose-500 group-hover:border-rose-600"
+                            : isHeld
+                            ? "bg-slate-300 border-slate-300 group-hover:border-slate-400"
+                            : "bg-white border-slate-300 group-hover:border-slate-400"
+                        }`}>
+                          {isPassed && !isSelected && (
+                            <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <path d="M3 8l3 3 6-6" />
+                            </svg>
+                          )}
+                          {isFailed && !isSelected && (
+                            <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <path d="M8 5v3.5M8 10.5h.01" />
+                            </svg>
+                          )}
+                          {isHeld && !isSelected && (
+                            <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="4" y="7" width="8" height="6" rx="1" /><path d="M6 7V5a2 2 0 0 1 4 0v2" />
+                            </svg>
+                          )}
+                          {!isPassed && !isFailed && !isHeld && !isSelected && (
+                            <span className="text-[11px] font-bold text-slate-400 font-mono">{cp.num}</span>
+                          )}
+                          {isSelected && (
+                            <span className="text-[11px] font-bold text-white font-mono">{cp.num}</span>
+                          )}
                         </div>
 
-                        {/* Checkpoint Number & Status Pill */}
-                        <div className="flex items-center justify-center gap-1.5 mb-1">
-                          <span className="font-mono text-[10px] font-bold text-slate-400">
-                            CP-{cp.num}
-                          </span>
-                          <span
-                            className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
-                              cp.statusColor === "emerald"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : cp.statusColor === "sky"
-                                ? "bg-sky-100 text-sky-800"
-                                : cp.statusColor === "rose"
-                                ? "bg-rose-100 text-rose-800"
-                                : "bg-slate-900 text-rose-300"
-                            }`}
-                          >
-                            {cp.status}
-                          </span>
+                        {/* Label */}
+                        <div className="text-center px-1">
+                          <div className={`text-[10px] font-mono font-bold uppercase tracking-wider mb-0.5 ${
+                            isSelected ? "text-[#0b1f4b]" : "text-slate-400"
+                          }`}>CP-{cp.num}</div>
+                          <div className={`text-[11px] font-semibold leading-tight ${
+                            isSelected ? "text-[#0b1f4b]" : "text-slate-600"
+                          }`}>{cp.name}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 leading-tight">{cp.date}</div>
                         </div>
-
-                        {/* Title & Date */}
-                        <div className="font-bold text-xs text-slate-900 leading-tight mb-0.5">
-                          {cp.name}
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-400 mb-1.5">
-                          {cp.date}
-                        </div>
-                        <p className="text-[11px] text-slate-600 leading-snug line-clamp-2">
-                          {cp.summary}
-                        </p>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
-
-                {/* Selected Checkpoint Highlight Detail Drawer */}
-                {selectedCheckpoint && (
-                  <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono font-bold bg-[#0b1f4b] text-white px-2 py-1 rounded text-xs">
-                        CP-0{selectedCheckpoint} Detail
-                      </span>
-                      <div>
-                        <span className="font-bold text-slate-800 mr-2">
-                          {checkpoints[selectedCheckpoint - 1].name}:
-                        </span>
-                        <span className="text-slate-600">
-                          {checkpoints[selectedCheckpoint - 1].detailedFinding}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="font-mono font-bold text-slate-700 bg-white px-3 py-1 rounded border border-slate-200 text-[11px] shadow-2xs">
-                      🔍 Evidence: {checkpoints[selectedCheckpoint - 1].proof}
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* Top Summary Banner */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-              <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 px-6 py-4 text-white flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-lg">
-                    ⚠️
-                  </span>
-                  <div>
-                    <h2 className="text-base font-black tracking-tight">
-                      Official Evidence Audit Findings — Project {currentProject.project_id}
-                    </h2>
-                    <p className="text-xs text-white/90">
-                      Physical Inspection & Remote Sensing Reconciliation Report · Prepared for Project Authority
+              {/* Detail strip */}
+              {selectedCheckpoint && (
+                <div className="mx-5 mb-4 p-3.5 bg-slate-50 rounded-lg border border-slate-200 flex items-start gap-3">
+                  <div className={`shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold font-mono ${
+                    checkpoints[selectedCheckpoint - 1].status.includes("PASSED") ? "bg-emerald-500"
+                      : checkpoints[selectedCheckpoint - 1].status.includes("FLAGGED") ? "bg-rose-500"
+                      : checkpoints[selectedCheckpoint - 1].status.includes("HELD") ? "bg-slate-400"
+                      : "bg-sky-500"
+                  }`}>
+                    {checkpoints[selectedCheckpoint - 1].num}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-[#0b1f4b]">{checkpoints[selectedCheckpoint - 1].name}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">· {checkpoints[selectedCheckpoint - 1].stage} · {checkpoints[selectedCheckpoint - 1].date}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                      {checkpoints[selectedCheckpoint - 1].detailedFinding}
                     </p>
                   </div>
                 </div>
-                <div className="bg-white text-amber-900 font-mono text-xs font-black px-3 py-1 rounded-full shadow-xs">
-                  STATUS: AUDIT DISCREPANCY FLAGGED
+              )}
+            </div>
+
+            {/* 3 Progress & Capital Comparison Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+              {/* Card 1: What Contractor Claimed */}
+              <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Invoiced Claim</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded border border-sky-200">
+                    Milestone #4
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-[#0b1f4b] tracking-tight">{claimedProgress}%</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  Contractor billing claim for complete column framework erection.
+                </div>
+                <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 font-medium">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Invoiced Capital:</span>
+                    <strong className="text-slate-900 font-mono font-bold">₹{invoicedTrancheCr} Cr</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Claim Date:</span>
+                    <span className="font-mono text-slate-700">22 Jul 2026</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Invoice Ref:</span>
+                    <span className="font-mono text-slate-700">NHAI/BILL/2026/881</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Plain English Takeaway */}
-              <div className="p-6">
-                <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 mb-6">
-                  <div className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <span>📌</span> What You Need to Know (In Plain Words)
+              {/* Card 2: What We Actually Found on the Ground */}
+              <div className="bg-white rounded-xl border border-rose-200/90 shadow-2xs p-5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-bold text-rose-800 uppercase tracking-wide">Audited Reality</span>
                   </div>
-                  <p className="text-sm text-slate-800 leading-relaxed font-medium">
-                    The contractor submitted invoices claiming that <strong>{claimedProgress}% of work is completed</strong> (Milestone #4: Superstructure Column Framework). 
-                    However, the on-site physical inspection and high-resolution drone scans conducted on 18 Sep 2026 proved that <strong>only {auditedProgress}% of work is actually completed on the ground</strong>. 
-                    Only <strong>4 of 24 required reinforced columns</strong> have been built. 
-                    Therefore, a financial tranche of <strong>₹{unverifiedGapCr} Crores has been held back</strong> until the contractor completes the missing 20 columns.
-                  </p>
+                  <span className="text-[10px] font-mono font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded border border-rose-200">
+                    Physical Shortfall
+                  </span>
                 </div>
-
-                {/* 3 Clear Side-by-Side Comparison Blocks */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-                  {/* Claim Card */}
-                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/80">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        1. What Was Invoiced / Claimed
-                      </span>
-                      <span className="text-xs font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                        Contractor
-                      </span>
-                    </div>
-                    <div className="text-4xl font-black text-slate-800 tracking-tight">{claimedProgress}%</div>
-                    <div className="text-xs font-bold text-slate-700 mt-1">Claim: Complete Column Framework</div>
-                    <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                      <span>Billed Amount:</span>
-                      <span className="font-mono font-bold text-slate-900">₹{invoicedTrancheCr} Cr</span>
-                    </div>
+                <div className="text-2xl font-black text-rose-600 tracking-tight">{auditedProgress}%</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  High-res drone photogrammetry verified only 4 of 24 pillars erected.
+                </div>
+                <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 font-medium">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Verified Capital:</span>
+                    <strong className="text-slate-900 font-mono font-bold">₹{verifiedTrancheCr} Cr</strong>
                   </div>
-
-                  {/* Ground Reality Card */}
-                  <div className="p-5 rounded-xl border border-rose-300 bg-rose-50/60">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">
-                        2. What Was Found on Ground
-                      </span>
-                      <span className="text-xs font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded">
-                        Physical Reality
-                      </span>
-                    </div>
-                    <div className="text-4xl font-black text-rose-700 tracking-tight">{auditedProgress}%</div>
-                    <div className="text-xs font-bold text-rose-900 mt-1">Observed: Only 4 of 24 Columns Built</div>
-                    <div className="text-xs text-rose-700 mt-3 pt-3 border-t border-rose-200 flex items-center justify-between">
-                      <span>Verified Value:</span>
-                      <span className="font-mono font-bold text-rose-950">₹{verifiedTrancheCr} Cr</span>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Physical Gap:</span>
+                    <strong className="text-rose-700 font-mono font-bold">-{progressGap}% Lag</strong>
                   </div>
-
-                  {/* Discrepancy Gap Card */}
-                  <div className="p-5 rounded-xl border border-amber-300 bg-amber-50/70">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                        3. The Unaccounted Gap
-                      </span>
-                      <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded">
-                        Audit Shortfall
-                      </span>
-                    </div>
-                    <div className="text-4xl font-black text-amber-700 tracking-tight">-{progressGap}%</div>
-                    <div className="text-xs font-bold text-amber-900 mt-1">Shortfall: 20 Unbuilt Columns</div>
-                    <div className="text-xs text-amber-800 mt-3 pt-3 border-t border-amber-200 flex items-center justify-between">
-                      <span>Payment Stopped:</span>
-                      <span className="font-mono font-bold text-amber-950">₹{unverifiedGapCr} Cr</span>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Missing Pillars:</span>
+                    <strong className="text-rose-700 font-semibold">20 Columns Not Built</strong>
                   </div>
                 </div>
+              </div>
 
-                {/* 4 Pillars of Evidence (Easy Explanations) */}
-                <div className="mt-8">
-                  <h3 className="text-sm font-black text-[#0b1f4b] uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <span>🔍</span> Complete Evidence Breakdown (Section 65B Audit Trail)
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Item 1 */}
-                    <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-lg shrink-0">
-                        📸
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-xs text-[#0b1f4b]">1. Site Photographs (Field Engineer)</h4>
-                          <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded">
-                            Discrepancy Confirmed
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Junior Engineer S. Venkatesh visited the site on 18 Sep 2026. The geo-tagged photos show only 4 pillars completed. Formwork scaffolding is missing for the rest of the site.
-                        </p>
-                      </div>
+              {/* Card 3: Action Taken (Payment Blocked) */}
+              <div className="bg-white rounded-xl border border-amber-200/90 shadow-2xs p-5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
                     </div>
-
-                    {/* Item 2 */}
-                    <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-lg shrink-0">
-                        🛰️
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-xs text-[#0b1f4b]">2. Drone Aerial Photogrammetry (KSRSAC)</h4>
-                          <span className="text-[10px] font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded">
-                            Analyzed & Divergent
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Drone flyover with 2cm/pixel resolution calculated a 3D elevation model of the plinth. The physical volume differs by 18% from the billing claims submitted by the contractor.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Item 3 */}
-                    <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shrink-0">
-                        📄
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-xs text-[#0b1f4b]">3. Material Purchases & GST Invoices</h4>
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                            Materials In Yard
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          Bank records confirm ₹45.2 Lakhs of Fe-550 TMT steel rebars were purchased. However, site inspection revealed the steel is sitting in the storage yard and has NOT been erected into columns.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Item 4 */}
-                    <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shrink-0">
-                        🧪
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-xs text-[#0b1f4b]">4. Concrete Quality & Strength Test</h4>
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                            Quality Passed (M25)
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          The 4 pillars that HAVE been poured meet government IS 456 standards with 27.8 N/mm² compressive strength. Structural safety of existing pillars is certified.
-                        </p>
-                      </div>
-                    </div>
+                    <span className="text-xs font-bold text-amber-800 uppercase tracking-wide">Treasury Action</span>
                   </div>
+                  <span className="text-[10px] font-mono font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                    Tranche Frozen
+                  </span>
                 </div>
-
-                {/* ============================================================ */}
-                {/* SATELLITE IMAGERY & ORBITAL TELEMETRY SPOTLIGHT             */}
-                {/* ============================================================ */}
-                <div className="mt-8 bg-gradient-to-br from-slate-900 via-[#0b1f4b] to-slate-950 text-white rounded-2xl p-6 shadow-md border border-slate-700/60 overflow-hidden relative">
-                  <div className="relative z-10">
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-white/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/30 flex items-center justify-center font-bold text-xl">
-                          🛰️
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-base font-black tracking-tight text-white">
-                              ISRO Cartosat-3 Orbital Pass — Project Corridor Footprint
-                            </h3>
-                            <span className="bg-sky-500/20 text-sky-300 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded border border-sky-400/30">
-                              0.28m GSD Panchromatic + 4-Band MX
-                            </span>
-                          </div>
-                          <p className="text-xs text-sky-200/80 mt-0.5">
-                            Spacecraft ID: C3-505 · Polar Sun-Synchronous LEO (505 km) · Track 43 / Frame 289
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono text-slate-300 bg-white/10 px-2.5 py-1 rounded border border-white/10">
-                          Pass: 14 Sep 2026 · 10:42:18 IST
-                        </span>
-                        <button
-                          onClick={() => setModalType("satellite")}
-                          className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
-                        >
-                          <span>Enlarge Satellite Telemetry</span>
-                          <span>🔍</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Visual Layout: Satellite Imagery Showcase + Telemetry Data */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                      {/* Left: Satellite Image with Interactive Visual Overlays */}
-                      <div 
-                        onClick={() => setModalType("satellite")}
-                        className="lg:col-span-7 relative rounded-xl overflow-hidden border border-sky-500/30 group bg-black shadow-lg min-h-[300px] cursor-pointer"
-                      >
-                        <img
-                          src="/evidence_satellite.jpg"
-                          alt="ISRO Cartosat-3 High-Resolution Satellite Pass"
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-
-                        {/* Telemetry HUD Overlays */}
-                        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                          <span className="bg-[#0b1f4b]/90 backdrop-blur-md text-sky-200 font-mono text-[10px] font-bold px-2.5 py-1 rounded border border-sky-400/30">
-                            ISRO NRSC ORBITAL FEED · UTM 43N
-                          </span>
-                          <span className="bg-black/75 backdrop-blur-md text-emerald-300 font-mono text-[10px] px-2 py-0.5 rounded border border-emerald-500/30">
-                            ● GEO-LOCKED TO SURVEY OF INDIA DATUM
-                          </span>
-                        </div>
-
-                        {/* Tactical Annotation Markers on the Satellite View */}
-                        <div className="absolute top-[35%] left-[45%] -translate-x-1/2 -translate-y-1/2 group/pin">
-                          <div className="w-5 h-5 rounded-full bg-rose-500/40 animate-ping absolute inset-0" />
-                          <div className="w-5 h-5 rounded-full bg-rose-600 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-lg relative z-10">
-                            !
-                          </div>
-                          <div className="absolute left-6 top-0 bg-slate-900/95 text-white text-[10px] px-2.5 py-1 rounded shadow-lg border border-rose-400 whitespace-nowrap hidden group-hover/pin:block z-20">
-                            <strong>River Crossing:</strong> Only 4 bridge piers visible; 20 columns missing
-                          </div>
-                        </div>
-
-                        <div className="absolute bottom-[28%] right-[22%] group/pin2">
-                          <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white flex items-center justify-center text-[9px] font-bold text-white shadow-lg">
-                            ✓
-                          </div>
-                          <div className="absolute right-6 bottom-0 bg-slate-900/95 text-white text-[10px] px-2.5 py-1 rounded shadow-lg border border-sky-400 whitespace-nowrap hidden group-hover/pin2:block z-20">
-                            <strong>Batching Plant:</strong> RMC depot detected on site boundary
-                          </div>
-                        </div>
-
-                        {/* Bottom Banner on Image */}
-                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/80 to-transparent p-3 flex items-center justify-between text-xs">
-                          <div className="font-mono text-[11px] text-sky-200">
-                            Lat 31°18'42.1"N · Lon 75°34'19.8"E · Sun Elev: 62.4°
-                          </div>
-                          <span className="text-xs text-sky-300 font-bold group-hover:underline flex items-center gap-1">
-                            Click to Expand Spectral Layers →
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Right: Space Observation Findings & Sensor Breakdown */}
-                      <div className="lg:col-span-5 flex flex-col justify-between gap-3">
-                        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                          <div className="text-[11px] font-bold text-sky-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <span>🛰️</span> Orbital Change Detection Findings
-                          </div>
-                          <ul className="space-y-2.5 text-xs text-slate-200">
-                            <li className="flex items-start gap-2">
-                              <span className="text-emerald-400 font-bold shrink-0">✓</span>
-                              <span><strong>Right-of-Way (RoW) Cleared:</strong> 45m corridor alignment fully cleared without local encroachment across Chainage 14+200 to 18+600.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <span className="text-rose-400 font-bold shrink-0">⚠️</span>
-                              <span><strong>Structural Column Discrepancy:</strong> High-resolution optical scan confirms only 4 piers visible at river crossing. 20 claimed columns are absent from satellite footprint.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <span className="text-sky-300 font-bold shrink-0">ℹ️</span>
-                              <span><strong>Ground Staging Verified:</strong> Ready-mix concrete plant and rebar storage yard detected at site perimeter matching GST dispatch records.</span>
-                            </li>
-                          </ul>
-                        </div>
-
-                        {/* Telemetry Spec Matrix */}
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
-                            <div className="text-[10px] text-slate-400 font-mono">SENSOR TYPE</div>
-                            <div className="font-bold text-white text-xs mt-0.5">ISRO Cartosat-3 PAN+MX</div>
-                          </div>
-                          <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
-                            <div className="text-[10px] text-slate-400 font-mono">SPATIAL RESOLUTION</div>
-                            <div className="font-bold text-sky-300 text-xs mt-0.5">0.28m Ground Pixel</div>
-                          </div>
-                          <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
-                            <div className="text-[10px] text-slate-400 font-mono">SATELLITE ORBIT</div>
-                            <div className="font-bold text-white text-xs mt-0.5">505 km Polar Sun-Sync</div>
-                          </div>
-                          <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
-                            <div className="text-[10px] text-slate-400 font-mono">SPECTRAL BANDS</div>
-                            <div className="font-bold text-emerald-300 text-xs mt-0.5">Panchromatic + 4 MX</div>
-                          </div>
-                        </div>
-
-                        {/* Quick Modal Trigger */}
-                        <button
-                          onClick={() => setModalType("satellite")}
-                          className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all text-center cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          <span>Open Full Interactive Satellite Telemetry Suite</span>
-                          <span>→</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="text-2xl font-black text-amber-600 tracking-tight">₹{unverifiedGapCr} Cr</div>
+                <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  Disbursement halted at Checkpoint 05 pending physical rectification.
                 </div>
-
-                {/* ============================================================ */}
-                {/* HOW DRISHTI AUDITS ARE MADE (4-TIER METHODOLOGY PIPELINE)    */}
-                {/* ============================================================ */}
-                <div className="mt-8 bg-white rounded-2xl border border-slate-200/90 p-6 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">🔬</span>
-                        <h3 className="text-base font-black text-[#0b1f4b] tracking-tight">
-                          How Drishti Audits Are Conducted — The 4-Tier Triangulation Pipeline
-                        </h3>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Every statutory finding is verified through an automated multi-layer audit chain connecting space telemetry, low-altitude photogrammetry, certified ground engineering, and public treasury banking.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                      <span>IMMUTABLE SECTION 65B CHAIN</span>
-                    </div>
+                <div className="mt-3.5 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600 font-medium">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Notice Status:</span>
+                    <span className="font-bold text-amber-700">72-Hr Show-Cause Notice</span>
                   </div>
-
-                  {/* 4 Interactive Tier Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Tier 1 */}
-                    <div className="p-4 rounded-xl border border-sky-200 bg-sky-50/40 flex flex-col justify-between hover:shadow-md transition-all">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-wider bg-sky-600 text-white px-2 py-0.5 rounded">
-                            Tier 1 · Space Telemetry
-                          </span>
-                          <span className="text-lg">🛰️</span>
-                        </div>
-                        <h4 className="font-bold text-xs text-[#0b1f4b] mb-1.5">
-                          Orbital Satellite Observation
-                        </h4>
-                        <div className="text-[11px] font-mono font-bold text-sky-800 mb-2">
-                          ISRO Cartosat-3 & Sentinel-2 Radar
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                          Captures bi-weekly 0.28m resolution satellite imagery over project geofences. AI computer vision automatically detects corridor right-of-way clearing, earthwork grading, and major structures without physical presence.
-                        </p>
-                      </div>
-                      <div className="pt-2.5 border-t border-sky-200/80 text-[11px] font-medium text-sky-900 flex items-center justify-between">
-                        <span>Why it matters:</span>
-                        <span className="font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-sky-300">Tamper-Proof Macro Truth</span>
-                      </div>
-                    </div>
-
-                    {/* Tier 2 */}
-                    <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 flex flex-col justify-between hover:shadow-md transition-all">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded">
-                            Tier 2 · UAV Drone Scans
-                          </span>
-                          <span className="text-lg">🚁</span>
-                        </div>
-                        <h4 className="font-bold text-xs text-[#0b1f4b] mb-1.5">
-                          Low-Altitude Photogrammetry
-                        </h4>
-                        <div className="text-[11px] font-mono font-bold text-indigo-800 mb-2">
-                          KSRSAC RTK Drone (2.2 cm/pixel)
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                          Licensed UAV pilots execute autonomous grid missions at 75m altitude. Generates 3D Digital Elevation Models (DEM) and volumetric measurements to compute exact cubic meters of earthwork and structural column count.
-                        </p>
-                      </div>
-                      <div className="pt-2.5 border-t border-indigo-200/80 text-[11px] font-medium text-indigo-900 flex items-center justify-between">
-                        <span>Why it matters:</span>
-                        <span className="font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-indigo-300">Centimeter Precision</span>
-                      </div>
-                    </div>
-
-                    {/* Tier 3 */}
-                    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 flex flex-col justify-between hover:shadow-md transition-all">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded">
-                            Tier 3 · Ground Physical
-                          </span>
-                          <span className="text-lg">📱</span>
-                        </div>
-                        <h4 className="font-bold text-xs text-[#0b1f4b] mb-1.5">
-                          Geotagged Field Inspection
-                        </h4>
-                        <div className="text-[11px] font-mono font-bold text-emerald-800 mb-2">
-                          Drishti Mobile App + Hardware GPS
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                          Field engineers visit physical sites and capture evidence using the Drishti Mobile App. Photos embed hardware-level GPS, compass heading, barometric elevation, and Stratum-1 atomic clock timestamps.
-                        </p>
-                      </div>
-                      <div className="pt-2.5 border-t border-emerald-200/80 text-[11px] font-medium text-emerald-900 flex items-center justify-between">
-                        <span>Why it matters:</span>
-                        <span className="font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-emerald-300">Sec 65B Legal Admissibility</span>
-                      </div>
-                    </div>
-
-                    {/* Tier 4 */}
-                    <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 flex flex-col justify-between hover:shadow-md transition-all">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-wider bg-amber-600 text-white px-2 py-0.5 rounded">
-                            Tier 4 · Financial Triangulation
-                          </span>
-                          <span className="text-lg">🏦</span>
-                        </div>
-                        <h4 className="font-bold text-xs text-[#0b1f4b] mb-1.5">
-                          Treasury & Material Matching
-                        </h4>
-                        <div className="text-[11px] font-mono font-bold text-amber-800 mb-2">
-                          PFMS Releases + GST e-Way Bills
-                        </div>
-                        <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                          Automated cross-reconciliation of Public Financial Management System (PFMS) disbursements with GST invoices (cement bags, Fe-550 TMT steel) vs. physical quantities identified by satellites and drones.
-                        </p>
-                      </div>
-                      <div className="pt-2.5 border-t border-amber-200/80 text-[11px] font-medium text-amber-900 flex items-center justify-between">
-                        <span>Why it matters:</span>
-                        <span className="font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-amber-300">Stops Ghost Billing</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Dispatched:</span>
+                    <span className="font-mono text-slate-700">19 Sep 2026 (11:42 AM)</span>
                   </div>
-
-                  {/* Automated Triangulation Process Banner */}
-                  <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-slate-700">Audit Triangulation Rule:</span>
-                      <span className="text-slate-600">
-                        If <strong>Contractor Invoiced Progress &gt; Audited Physical Reality by ≥ 10%</strong>, the next financial tranche is automatically frozen at Checkpoint 05 until field rectifications are corroborated.
-                      </span>
-                    </div>
-                    <div className="font-mono text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded border border-rose-200">
-                      TRIGGERED FOR {currentProject.project_id}: LAG -{progressGap}%
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clear Next Steps Box */}
-                <div className="mt-8 bg-[#0b1f4b] text-white rounded-xl p-5 shadow-xs">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-sky-300 mb-2">
-                    <span>⚖️</span> Official Action Order & Next Steps
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-3">
-                    <div className="bg-white/10 p-3.5 rounded-lg border border-white/10">
-                      <div className="font-bold text-white mb-1">🛑 1. Hold Payment</div>
-                      <p className="text-sky-100/80">Pause tranche payment of ₹{unverifiedGapCr} Cr until the remaining 20 columns are erected.</p>
-                    </div>
-                    <div className="bg-white/10 p-3.5 rounded-lg border border-white/10">
-                      <div className="font-bold text-white mb-1">⏱️ 2. 72-Hour Explanation Notice</div>
-                      <p className="text-sky-100/80">Issued statutory show-cause notice to the Executive Engineer to clarify the progress discrepancy.</p>
-                    </div>
-                    <div className="bg-white/10 p-3.5 rounded-lg border border-white/10">
-                      <div className="font-bold text-white mb-1">📅 3. Verification Audit</div>
-                      <p className="text-sky-100/80">Next follow-up drone inspection and site re-audit scheduled for 15 Oct 2026.</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-sky-200 font-mono">
-                    <span>Officer on Record: S. Venkatesh (JE, KES)</span>
-                    <button
-                      onClick={() => setViewTab("desk")}
-                      className="text-white underline font-bold cursor-pointer hover:text-sky-300"
-                    >
-                      Inspect Raw Evidence Imagery & Telemetry →
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Resolution Due:</span>
+                    <span className="font-mono text-rose-600 font-bold">22 Sep 2026</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* ============================================================ */}
-        {/* VIEW 2: INTERACTIVE VISUAL VERIFICATION DESK                 */}
-        {/* ============================================================ */}
-        {viewTab === "desk" && (
-          <div className="mt-4 animate-in fade-in duration-200">
             {/* Verifiable Temporal Milestone Trail */}
             <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -1727,7 +1267,6 @@ export default function Evidence() {
               </div>
             </div>
           </div>
-        )}
       </div>
 
       {/* Interactive Modals */}
@@ -1881,6 +1420,12 @@ export default function Evidence() {
                 </div>
                 {modalData?.image && (
                   <img src={modalData.image} alt={modalData.title} className="w-full h-48 object-cover rounded-lg border border-slate-200 mb-3" />
+                )}
+                {modalData?.voucherData && (
+                  <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 mb-3">
+                    <div className="text-xl font-black text-emerald-900">{modalData.voucherData.amount}</div>
+                    <div className="text-xs font-mono text-slate-600 mt-0.5">{modalData.voucherData.ref}</div>
+                  </div>
                 )}
                 <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
                   {modalData?.description}

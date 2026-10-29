@@ -42,6 +42,8 @@ class ScopePermission(permissions.BasePermission):
             return has_capability(request.user, 'create_corrective_actions')
         if action_name in ('corrective_actions',) and request.method == 'GET':
             return has_capability(request.user, 'view_corrective_actions')
+        if action_name in ('checklist', 'all_checklists'):
+            return True
         if request.method not in permissions.SAFE_METHODS and get_role(request.user) == Role.CITIZEN:
             return False
         return True
@@ -106,12 +108,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
             db = client['drishti_db']
             collection = db['projects']
             
-            query = mongo_project_query(request.user)
-            docs = list(collection.find(query))
+            scope = request.query_params.get('scope')
+            if scope == 'all' and (not getattr(request.user, 'is_authenticated', False) or has_capability(request.user, 'view_contractors')):
+                query = {'data_source_type': {'$ne': 'SYNTHETIC_DEMO'}}
+            else:
+                query = mongo_project_query(request.user)
+            docs = list(collection.find(query).sort('project_id', 1))
             project_ids = [d.get("project_id") for d in docs if d.get("project_id")]
             assessments = list(db['risk_assessments'].find({"project_id": {"$in": project_ids}}))
             ml_assessments = list(db['ml_assessments'].find({"project_id": {"$in": project_ids}}))
+            checklist_docs = list(db['inspection_checklists'].find({"project_id": {"$in": project_ids}}))
             client.close()
+            latest_checklists = {c.get("project_id"): c.get("checked_items", {}) for c in checklist_docs}
             
             latest_assessments = {}
             for a in assessments:
@@ -145,7 +153,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         ml_assessment = {
                             "ml_anomaly_score": round(ml_score, 2),
                             "anomaly_flag": bool(flag),
-                            "anomaly_status": "ANOMALOUS" if flag else "NORMAL",
+                            "anomaly_status": "ASSESSED",
                             "explanation": "Flagged by ML Isolation Forest model" if flag else "Within expected distribution"
                         }
                         latest_ml_assessments[pid] = ml_assessment
@@ -177,8 +185,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     "risk_level": assessment.get("risk_level", None),
                     "ml_anomaly_score": ml_assessment.get("ml_anomaly_score", None),
                     "anomaly_flag": ml_assessment.get("anomaly_flag", None),
-                    "anomaly_status": ml_assessment.get("anomaly_status", "NOT_ASSESSED"),
-                    "ml_explanation": ml_assessment.get("explanation", None)
+                    "anomaly_status": "ASSESSED" if ml_assessment.get("ml_anomaly_score") is not None else ml_assessment.get("anomaly_status", "NOT_ASSESSED"),
+                    "ml_explanation": ml_assessment.get("explanation", None),
+                    "inspection_checklist": latest_checklists.get(doc.get("project_id"), {})
                 }
                 results.append(sanitize_project_payload(request.user, payload))
                 
@@ -191,12 +200,203 @@ class ProjectViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"MongoDB Atlas Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def perform_create(self, serializer):
-        # Audit event will be handled by signals or overridden methods later
-        serializer.save()
+    def create(self, request, *args, **kwargs):
+        """Create a new project document directly in MongoDB Atlas drishti_db.projects."""
+        import os
+        from datetime import datetime, timezone
+        from pymongo import MongoClient
+        
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        data = request.data
+        project_name = data.get('project_name')
+        if not project_name or not str(project_name).strip():
+            return Response({"error": "project_name is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            client = MongoClient(mongo_uri)
+            db = client['drishti_db']
+            collection = db['projects']
+            
+            # Auto-generate next project_id if not provided
+            project_id = data.get('project_id')
+            if not project_id:
+                existing_ids = [d.get('project_id') for d in collection.find({}, {'project_id': 1})]
+                highest_num = 0
+                for pid in existing_ids:
+                    if pid and str(pid).startswith('DR-'):
+                        try:
+                            num = int(str(pid)[3:])
+                            if num > highest_num:
+                                highest_num = num
+                        except ValueError:
+                            pass
+                project_id = f"DR-{highest_num + 1:04d}"
+            else:
+                project_id = str(project_id).strip().upper()
+                if collection.find_one({"project_id": project_id}):
+                    client.close()
+                    return Response({"error": f"Project with ID '{project_id}' already exists in MongoDB."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            orig_cr = float(data.get('original_cost_cr') or data.get('original_cost') or 100.0)
+            rev_cr = float(data.get('revised_cost_cr') or data.get('revised_cost') or orig_cr)
+            exp_cr = float(data.get('expenditure_cr') or data.get('expenditure') or 0.0)
+            progress_pct = float(data.get('reported_progress_pct') or data.get('reported_progress') or 0.0)
+            
+            doc = {
+                "project_id": project_id,
+                "project_name": str(project_name).strip(),
+                "state": data.get('state', 'Delhi'),
+                "district": data.get('district', '') or '',
+                "sector": data.get('sector') or data.get('department', 'Infrastructure'),
+                "department": data.get('department') or data.get('sector', 'Infrastructure'),
+                "scheme": data.get('scheme', 'Central Infrastructure Scheme'),
+                "project_category": data.get('project_category', 'Mega Project'),
+                "work_type": data.get('work_type', 'Civil Construction'),
+                "location_from": data.get('location_from', '') or '',
+                "location_to": data.get('location_to', '') or '',
+                "latitude": float(data.get('latitude') or 28.6139),
+                "longitude": float(data.get('longitude') or 77.2090),
+                "original_cost_cr": orig_cr,
+                "revised_cost_cr": rev_cr,
+                "expenditure_cr": exp_cr,
+                "reported_progress_pct": progress_pct,
+                "data_source_type": data.get('data_source_type', 'OFFICIAL'),
+                "verification_status": data.get('verification_status', 'NOT_REVIEWED'),
+                "is_public": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            
+            collection.insert_one(doc)
+            
+            # Initialize empty checklist in inspection_checklists
+            db['inspection_checklists'].update_one(
+                {"project_id": project_id},
+                {"$setOnInsert": {"project_id": project_id, "checked_items": {}, "updated_at": datetime.now(timezone.utc).isoformat()}},
+                upsert=True
+            )
+            client.close()
+            
+            # Format payload for frontend
+            doc.pop('_id', None)
+            doc['reported_progress'] = progress_pct
+            doc['original_cost'] = orig_cr
+            doc['revised_cost'] = rev_cr
+            doc['expenditure'] = exp_cr
+            return Response(doc, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": f"Failed to create project in MongoDB: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def perform_update(self, serializer):
-        serializer.save()
+    def update(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Update a project document in MongoDB Atlas drishti_db.projects."""
+        import os
+        from datetime import datetime, timezone
+        from pymongo import MongoClient
+        
+        pk = kwargs.get('pk')
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        data = request.data
+        try:
+            client = MongoClient(mongo_uri)
+            db = client['drishti_db']
+            collection = db['projects']
+            
+            existing = collection.find_one({"project_id": pk})
+            if not existing:
+                client.close()
+                return Response({"error": f"Project '{pk}' not found in MongoDB."}, status=status.HTTP_404_NOT_FOUND)
+            
+            update_fields = {}
+            field_mappings = {
+                'project_name': str,
+                'state': str,
+                'district': str,
+                'sector': str,
+                'department': str,
+                'scheme': str,
+                'project_category': str,
+                'work_type': str,
+                'location_from': str,
+                'location_to': str,
+                'data_source_type': str,
+                'verification_status': str,
+            }
+            for field, type_fn in field_mappings.items():
+                if field in data and data[field] is not None:
+                    update_fields[field] = type_fn(data[field])
+            
+            if 'original_cost_cr' in data or 'original_cost' in data:
+                val = data.get('original_cost_cr', data.get('original_cost'))
+                update_fields['original_cost_cr'] = float(val)
+            if 'revised_cost_cr' in data or 'revised_cost' in data:
+                val = data.get('revised_cost_cr', data.get('revised_cost'))
+                update_fields['revised_cost_cr'] = float(val)
+            if 'expenditure_cr' in data or 'expenditure' in data:
+                val = data.get('expenditure_cr', data.get('expenditure'))
+                update_fields['expenditure_cr'] = float(val)
+            if 'reported_progress_pct' in data or 'reported_progress' in data:
+                val = data.get('reported_progress_pct', data.get('reported_progress'))
+                update_fields['reported_progress_pct'] = float(val)
+            if 'latitude' in data and data['latitude'] is not None:
+                update_fields['latitude'] = float(data['latitude'])
+            if 'longitude' in data and data['longitude'] is not None:
+                update_fields['longitude'] = float(data['longitude'])
+            if 'is_public' in data and data['is_public'] is not None:
+                update_fields['is_public'] = bool(data['is_public'])
+                
+            update_fields['updated_at'] = datetime.now(timezone.utc).isoformat()
+            
+            collection.update_one({"project_id": pk}, {"$set": update_fields})
+            updated_doc = collection.find_one({"project_id": pk}, {'_id': 0})
+            client.close()
+            
+            if updated_doc:
+                updated_doc['reported_progress'] = updated_doc.get('reported_progress_pct')
+                updated_doc['original_cost'] = updated_doc.get('original_cost_cr')
+                updated_doc['revised_cost'] = updated_doc.get('revised_cost_cr')
+                updated_doc['expenditure'] = updated_doc.get('expenditure_cr')
+                return Response(updated_doc, status=status.HTTP_200_OK)
+            return Response({"error": "Failed to retrieve updated document."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": f"Failed to update project in MongoDB: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a project document from MongoDB Atlas drishti_db.projects."""
+        import os
+        from pymongo import MongoClient
+        
+        pk = kwargs.get('pk')
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        try:
+            client = MongoClient(mongo_uri)
+            db = client['drishti_db']
+            
+            res = db['projects'].delete_one({"project_id": pk})
+            if res.deleted_count == 0:
+                client.close()
+                return Response({"error": f"Project '{pk}' not found in MongoDB."}, status=status.HTTP_404_NOT_FOUND)
+                
+            # Clean up associated checklists
+            db['inspection_checklists'].delete_many({"project_id": pk})
+            db['risk_assessments'].delete_many({"project_id": pk})
+            db['ml_assessments'].delete_many({"project_id": pk})
+            client.close()
+            
+            return Response({"message": f"Project '{pk}' successfully deleted from MongoDB Atlas.", "project_id": pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Failed to delete project from MongoDB: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_mongo_project(self, project_id):
         import os
@@ -306,7 +506,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "risk_level": risk_assessment.get("risk_level"),
                 "ml_anomaly_score": ml_assessment.get("ml_anomaly_score"),
                 "anomaly_flag": ml_assessment.get("anomaly_flag"),
-                "anomaly_status": ml_assessment.get("anomaly_status", "NOT_ASSESSED"),
+                "anomaly_status": "ASSESSED" if ml_assessment.get("ml_anomaly_score") is not None else ml_assessment.get("anomaly_status", "NOT_ASSESSED"),
                 "ml_explanation": ml_assessment.get("explanation"),
             }
             return Response(sanitize_project_payload(request.user, payload))
@@ -692,4 +892,65 @@ class ProjectViewSet(viewsets.ModelViewSet):
             request._full_data = data
             return handler.create(request)
         return Response({"error": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
+
+    @action(detail=False, methods=['get'], url_path='checklists')
+    def all_checklists(self, request):
+        """Retrieve all Section 65B inspection checklists from MongoDB Atlas."""
+        import os
+        from pymongo import MongoClient
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            return Response({"error": "MongoDB not configured"}, status=500)
+        try:
+            client = MongoClient(mongo_uri)
+            db = client['drishti_db']
+            docs = list(db['inspection_checklists'].find())
+            client.close()
+            results = {d.get("project_id"): d.get("checked_items", {}) for d in docs if d.get("project_id")}
+            return Response(results)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+    @action(detail=True, methods=['get', 'post', 'patch'], url_path='checklist')
+    def checklist(self, request, pk=None):
+        """Get or save Section 65B inspection checklist for a project in MongoDB Atlas."""
+        import os
+        from pymongo import MongoClient
+        from datetime import datetime, timezone
+
+        mongo_uri = os.getenv('MONGO_URI')
+        if not mongo_uri:
+            return Response({"error": "MongoDB not configured"}, status=500)
+
+        try:
+            client = MongoClient(mongo_uri)
+            db = client['drishti_db']
+            col = db['inspection_checklists']
+
+            if request.method == 'GET':
+                doc = col.find_one({"project_id": pk})
+                client.close()
+                if doc and "_id" in doc:
+                    del doc["_id"]
+                return Response(doc or {"project_id": pk, "checked_items": {}})
+
+            # Save / update checklist
+            checked_items = request.data.get("checked_items", {})
+            user_name = getattr(request.user, "username", "Official Auditor")
+            verified_count = sum(1 for v in checked_items.values() if v)
+
+            doc = {
+                "project_id": pk,
+                "checked_items": checked_items,
+                "verified_count": verified_count,
+                "total_count": len(checked_items) or 7,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": user_name
+            }
+
+            col.update_one({"project_id": pk}, {"$set": doc}, upsert=True)
+            client.close()
+            return Response({"status": "saved", "project_id": pk, "checked_items": checked_items, "verified_count": verified_count})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+

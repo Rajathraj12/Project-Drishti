@@ -10,6 +10,7 @@
     "format": "oxfmt"
   },
   "dependencies": {
+    "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

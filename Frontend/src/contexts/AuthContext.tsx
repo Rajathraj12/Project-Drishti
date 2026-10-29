@@ -6,7 +6,11 @@ import { isRole, landingPath, normalizeRole } from '../permissions/rbac';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isGuest: boolean;
   login: (credentials: any) => Promise<User>;
+  loginCitizen: (credentials: { email?: string; username?: string; password: string }) => Promise<User>;
+  registerCitizen: (data: { email: string; password: string; full_name: string; state?: string; district?: string; phone?: string }) => Promise<User>;
+  loginWithGoogle: (data: { credential?: string; email?: string; name?: string; google_id?: string; photo_url?: string }) => Promise<User>;
   logout: () => void;
   setDevRole: (role: string) => Promise<void>;
   devRole: string | null;
@@ -95,6 +99,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return normalized;
   };
 
+  const loginCitizen = async (credentials: any) => {
+    const res = await authService.citizenLogin(credentials);
+    localStorage.setItem('token', res.token);
+    const role = normalizeRole(res.user.role);
+    const normalized = { ...res.user, role: role || res.user.role };
+    setUser(normalized);
+    setDataEpoch((value) => value + 1);
+    return normalized;
+  };
+
+  const registerCitizen = async (data: any) => {
+    const res = await authService.citizenRegister(data);
+    localStorage.setItem('token', res.token);
+    const role = normalizeRole(res.user.role);
+    const normalized = { ...res.user, role: role || res.user.role };
+    setUser(normalized);
+    setDataEpoch((value) => value + 1);
+    return normalized;
+  };
+
+  const loginWithGoogle = async (data: any) => {
+    const res = await authService.googleLogin(data);
+    localStorage.setItem('token', res.token);
+    const role = normalizeRole(res.user.role);
+    const normalized = { ...res.user, role: role || res.user.role };
+    setUser(normalized);
+    setDataEpoch((value) => value + 1);
+    return normalized;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('dev_role');
@@ -120,7 +154,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       user,
       loading,
+      isGuest: !user,
       login,
+      loginCitizen,
+      registerCitizen,
+      loginWithGoogle,
       logout,
       setDevRole,
       devRole,

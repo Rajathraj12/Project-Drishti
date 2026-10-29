@@ -110,8 +110,9 @@ export default function ContractorProfile() {
     )
   }
 
-  const isHighRisk = contractor.avgRisk >= 70
-  const isMediumRisk = contractor.avgRisk >= 50 && contractor.avgRisk < 70
+  const isNoProjects = contractor.totalProjects === 0
+  const isHighRisk = !isNoProjects && contractor.avgRisk >= 60
+  const isMediumRisk = !isNoProjects && contractor.avgRisk >= 35 && contractor.avgRisk < 60
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
@@ -136,12 +137,18 @@ export default function ContractorProfile() {
               🏗️
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-bold text-navy-600 bg-navy-50 px-2 py-0.5 rounded">
                   {contractor.id}
                 </span>
-                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Registered Contractor
+                <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200" title="Institutional Reliability Rating">
+                  Rating: {contractor.creditRating}
+                </span>
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200" title="Historical On-Time Execution Rate">
+                  {contractor.onTimeDeliveryRate}% On-Time
+                </span>
+                <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200" title="Statutory Quality Compliance Index">
+                  {contractor.qualityComplianceRate}% Quality Pass
                 </span>
                 <span className="text-xs text-slate-400">Est. {contractor.established}</span>
               </div>
@@ -331,7 +338,7 @@ export default function ContractorProfile() {
                   const progress = Number(proj.reported_progress_pct ?? proj.reported_progress ?? 0)
                   const cost = Number(proj.revised_cost_cr || proj.original_cost_cr || proj.revised_cost || proj.original_cost || 0)
                   const exp = Number(proj.expenditure_cr || proj.expenditure || 0)
-                  const risk = Number(proj.risk_score || 35)
+                  const risk = Number(proj.risk_score != null ? proj.risk_score : 0)
                   const isProjHighRisk = risk >= 60 || Boolean(proj.anomaly_flag)
                   const isOverrun = Number(proj.cost_overrun_cr || 0) > 0
 

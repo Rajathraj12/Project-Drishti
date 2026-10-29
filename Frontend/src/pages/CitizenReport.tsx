@@ -1,5 +1,6 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import { useAuth } from "../contexts/AuthContext"
 import { citizenReportService } from "../services/citizenReportService"
 
 type ReportStep = "form" | "submitted"
@@ -33,8 +34,30 @@ export default function CitizenReport() {
   })
   const [photoName, setPhotoName] = useState<string | null>(null)
 
+  const { user, isGuest } = useAuth()
+  const location = useLocation()
+
+  // Restore saved form draft if returning after login
+  useEffect(() => {
+    const draft = sessionStorage.getItem("drishti_pending_report")
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft)
+        setForm(parsed.form || form)
+        if (parsed.photoName) setPhotoName(parsed.photoName)
+        sessionStorage.removeItem("drishti_pending_report")
+      } catch (e) {}
+    }
+  }, [])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (isGuest || !user) {
+      // Save draft so user doesn't lose anything
+      sessionStorage.setItem("drishti_pending_report", JSON.stringify({ form, photoName }))
+      navigate("/login?tab=citizen&redirect=/report")
+      return
+    }
     const report = citizenReportService.submitReport({
       projectId: form.projectId,
       issueType: form.issueType,
@@ -116,6 +139,66 @@ export default function CitizenReport() {
           Submit an issue or concern about a government project in your area. All reports are reviewed by the relevant authority.
         </p>
       </div>
+
+      {/* Guest Citizen Authentication Alert */}
+      {isGuest && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 shadow-inner">
+              🏛️
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display font-bold text-base text-amber-950">
+                  Citizen Sign-In Required to Submit Grievances
+                </h3>
+                <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  MoSPI Statutory Rule
+                </span>
+              </div>
+              <p className="text-xs text-amber-900/80 mt-1 leading-relaxed">
+                You are currently browsing as a <strong>Guest</strong>. You may fill out this issue report now, but under Central Vigilance Guidelines, filing a public grievance requires citizen verification to prevent spam and link resolution updates to your account.
+              </p>
+              <div className="flex flex-wrap items-center gap-2.5 mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sessionStorage.setItem("drishti_pending_report", JSON.stringify({ form, photoName }))
+                    navigate("/login?tab=citizen&redirect=/report")
+                  }}
+                  className="bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5"
+                >
+                  <span>🇮🇳</span> Sign In as Citizen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sessionStorage.setItem("drishti_pending_report", JSON.stringify({ form, photoName }))
+                    navigate("/login?tab=citizen&sub=register&redirect=/report")
+                  }}
+                  className="bg-white hover:bg-amber-100/50 text-slate-800 border border-amber-300 text-xs font-bold px-3.5 py-2 rounded-xl transition"
+                >
+                  Create Citizen Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isGuest && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 mb-6 flex items-center justify-between gap-3 text-xs text-blue-900">
+          <div className="flex items-center gap-2">
+            <span className="text-base">👤</span>
+            <span>
+              Submitting as <strong>{user?.first_name ? `${user.first_name} ${user.last_name || ''}` : user?.username}</strong> ({user?.email})
+            </span>
+          </div>
+          <span className="bg-blue-100 text-blue-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded">
+            CITIZEN VERIFIED
+          </span>
+        </div>
+      )}
 
       {/* Info box */}
       <div className="bg-accent-100 border border-accent-400/20 rounded-xl p-4 mb-6 flex items-start gap-3">

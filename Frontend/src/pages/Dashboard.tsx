@@ -619,7 +619,7 @@ export default function Dashboard() {
                   <tbody>
                     {projects.sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 10).map((p, i) => {
                       const riskScore = p.risk_score;
-                      const status = p.risk_level ? `${p.risk_level} Risk` : (riskScore != null ? (riskScore >= 70 ? 'High Risk' : (riskScore >= 40 ? 'Medium Risk' : 'Low Risk')) : 'Not Analyzed');
+                      const status = p.risk_level ? `${p.risk_level} Risk` : (riskScore != null ? (riskScore >= 60 ? 'High Risk' : (riskScore >= 35 ? 'Medium Risk' : 'Low Risk')) : 'Not Analyzed');
                       const progressStr = p.reported_progress != null ? `${p.reported_progress}` : "0";
                       
                       return (
@@ -650,7 +650,7 @@ export default function Dashboard() {
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                             <span style={{
                               fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1rem",
-                              color: riskScore == null ? "var(--color-text-muted)" : (riskScore >= 70 ? "var(--color-risk-high)" : riskScore >= 40 ? "var(--color-risk-medium)" : "var(--color-risk-low)"),
+                              color: riskScore == null ? "var(--color-text-muted)" : (riskScore >= 60 ? "var(--color-risk-high)" : riskScore >= 35 ? "var(--color-risk-medium)" : "var(--color-risk-low)"),
                             }}>{riskScore != null ? riskScore : "N/A"}</span>
                             <RiskBadge status={status} />
                           </div>
@@ -658,18 +658,18 @@ export default function Dashboard() {
                         )}
                         {canViewMl && (
                         <td>
-                          {p.anomaly_status === "ASSESSED" ? (
+                          {p.ml_anomaly_score != null || p.anomaly_status === "ASSESSED" || p.anomaly_status === "ANOMALOUS" || p.anomaly_status === "NORMAL" ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                               <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "0.9rem", color: p.anomaly_flag ? "var(--color-risk-high)" : "var(--color-risk-low)" }}>
-                                Score: {p.ml_anomaly_score}
+                                Score: {p.ml_anomaly_score != null ? p.ml_anomaly_score : "—"}
                               </span>
                               <span style={{ fontSize: "0.75rem", color: p.anomaly_flag ? "#b91c1c" : "#15803d", fontWeight: "bold", background: p.anomaly_flag ? "#fef2f2" : "#f0fdf4", padding: "2px 6px", borderRadius: "4px", width: "fit-content" }}>
                                 {p.anomaly_flag ? "ANOMALOUS" : "NORMAL"}
                               </span>
-                              {p.anomaly_flag && <span style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }} title={p.ml_explanation}>Hover for Details</span>}
+                              {p.anomaly_flag && <span style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }} title={p.ml_explanation || "Statistical anomaly flagged by Isolation Forest"}>Hover for Details</span>}
                             </div>
                           ) : (
-                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>{p.anomaly_status?.replace("_", " ")}</span>
+                            <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>{p.anomaly_status?.replace("_", " ") || "NOT ASSESSED"}</span>
                           )}
                         </td>
                         )}

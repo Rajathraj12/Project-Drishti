@@ -62,5 +62,56 @@ export const authService = {
    */
   async getDemoUsers(): Promise<DemoUsersResponse> {
     return fetchApi<DemoUsersResponse>('/auth/demo-users/');
-  }
+  },
+
+  /**
+   * POST /api/auth/citizen/register/
+   * Creates a citizen account in MongoDB and Django
+   */
+  async citizenRegister(data: {
+    email: string;
+    password: string;
+    full_name: string;
+    state?: string;
+    district?: string;
+    phone?: string;
+  }): Promise<LoginResponse> {
+    return fetchApi<LoginResponse>('/auth/citizen/register/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * POST /api/auth/citizen/login/
+   * Authenticates a citizen account against MongoDB
+   */
+  async citizenLogin(credentials: {
+    email?: string;
+    username?: string;
+    password: string;
+  }): Promise<LoginResponse> {
+    return fetchApi<LoginResponse>('/auth/citizen/login/', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  },
+
+  /**
+   * POST /api/auth/google/
+   * Authenticates a citizen via Google OAuth ID token or profile
+   */
+  async googleLogin(data: {
+    credential?: string;
+    email?: string;
+    name?: string;
+    google_id?: string;
+    sub?: string;
+    photo_url?: string;
+  }): Promise<LoginResponse> {
+    return fetchApi<LoginResponse>('/auth/google/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };

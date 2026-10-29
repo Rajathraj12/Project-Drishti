@@ -12,6 +12,7 @@ interface InspectionItem {
   name: string;
   state: string;
   department: string;
+  sector: string;
   claimedProgress: number;
   auditedProgress: number;
   progressGap: number;
@@ -28,19 +29,337 @@ interface InspectionItem {
   evidenceCount: number;
 }
 
-const defaultChecklist = [
-  { id: "c1", title: "Site boundary benchmark & geodetic datum frozen (CP-01)", proof: "Survey of India WGS84 Datum Lock" },
-  { id: "c2", title: "Concrete compressive core test (IS 456 M25 certified) (CP-02)", proof: "27.8 N/mm² NABL Certified" },
-  { id: "c3", title: "Superstructure column framework & rebar count (CP-04)", proof: "4 of 24 Erected · Shortfall: 20" },
-  { id: "c4", title: "Volumetric cut/fill photogrammetry comparison (Drone RTK)", proof: "KSRSAC 2.2 cm/px 3D DSM Mesh" },
-  { id: "c5", title: "Material yard physical rebar & cement inventory (Tier 4)", proof: "160 MT Fe-550 Steel in Depot" },
-  { id: "c6", title: "Stratum-1 GPS & barometric elevation cryptographic EXIF (Tier 3)", proof: "SHA-256 e849f... Hardware Stamp" },
-  { id: "c7", title: "Statutory 72-hour explanation show-cause notice dispatched (CP-05)", proof: "Dispatched to EE on Record" },
-];
+export type SectorCategory = "roads" | "railways" | "water" | "power" | "telecom" | "mining" | "buildings";
+
+export function resolveSectorCategory(sector?: string, name?: string): SectorCategory {
+  const s = (sector || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+
+  if (s.includes("road") || s.includes("highway") || n.includes("expressway") || n.includes("nh-") || n.includes("road") || n.includes("corridor") || n.includes("flyover") || n.includes("bridge")) {
+    return "roads";
+  }
+  if (s.includes("rail") || n.includes("rail") || n.includes("metro") || n.includes("line doubling") || n.includes("station")) {
+    return "railways";
+  }
+  if (s.includes("water") || s.includes("oil") || s.includes("gas") || n.includes("pipeline") || n.includes("canal") || n.includes("dam") || n.includes("water") || n.includes("irrigation")) {
+    return "water";
+  }
+  if (s.includes("power") || s.includes("electric") || s.includes("transmission") || n.includes("substation") || n.includes("solar") || n.includes("thermal") || n.includes("grid")) {
+    return "power";
+  }
+  if (s.includes("telecom") || n.includes("ofc") || n.includes("tower") || n.includes("fiber") || n.includes("broadband")) {
+    return "telecom";
+  }
+  if (s.includes("coal") || s.includes("mining") || n.includes("mine") || n.includes("pit") || n.includes("colliery")) {
+    return "mining";
+  }
+  return "buildings";
+}
+
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  proof: string;
+}
+
+export const sectorChecklists: Record<SectorCategory, ChecklistItem[]> = {
+  roads: [
+    { id: "c1", title: "Right-of-Way (RoW) boundary & centerline geodetic lock (CP-01)", proof: "MoRTH WGS84 Chainage Telemetry" },
+    { id: "c2", title: "Subgrade compaction & Granular Sub-Base (GSB) density (IRC:37)", proof: "98.8% Modified Proctor Density" },
+    { id: "c3", title: "Dense Bituminous Macadam (DBM) & wearing course thickness (CP-04)", proof: "50mm DBM Core Sample Tested" },
+    { id: "c4", title: "Volumetric cut/fill photogrammetry comparison (Drone RTK)", proof: "2.2 cm/px 3D DSM Terrain Mesh" },
+    { id: "c5", title: "Drainage culverts, median crash barriers & signage inventory (Tier 4)", proof: "18 of 22 Culverts Certified" },
+    { id: "c6", title: "Stratum-1 GPS & laser roughness profilometer telemetry (IRI < 2.0)", proof: "SHA-256 e849f... Hardware Stamp" },
+    { id: "c7", title: "Statutory 72-hour explanation show-cause notice dispatched (CP-05)", proof: "Dispatched to Project Director (NHAI)" },
+  ],
+  railways: [
+    { id: "c1", title: "Track alignment geodetic datum & formation blanketing lock (CP-01)", proof: "RDSO WGS84 Geodetic Alignment" },
+    { id: "c2", title: "Formation soil stabilization & plate load test (Ev2 ≥ 45 MPa)", proof: "48.2 MPa NABL Certified" },
+    { id: "c3", title: "Track ballast cushion depth & sleeper spacing compliance (CP-04)", proof: "300mm Ballast Cushion Verified" },
+    { id: "c4", title: "Overhead Electrification (OHE) mast foundation & cantilevers", proof: "38 of 42 Masts Erected & Grouted" },
+    { id: "c5", title: "Volumetric corridor LiDAR & station viaduct photogrammetry", proof: "Drone LiDAR Clearance Point Cloud" },
+    { id: "c6", title: "Axle counter & electronic interlocking signal geo-stamp (Tier 3)", proof: "SIL-4 Cryptographic Audit Stamp" },
+    { id: "c7", title: "Statutory Commission of Railway Safety (CRS) audit docket (CP-05)", proof: "Dispatched to Chief Track Engineer" },
+  ],
+  water: [
+    { id: "c1", title: "Corridor easement, intake datum & pipeline alignment lock (CP-01)", proof: "Survey of India WGS84 Corridor Lock" },
+    { id: "c2", title: "Trench excavation depth & granular bedding layer compaction", proof: "150mm Sand Bedding Verified" },
+    { id: "c3", title: "Hydrostatic pipeline pressure & leak test (1.5x working head) (CP-04)", proof: "12 Bar Pressure Held for 24 Hrs" },
+    { id: "c4", title: "Canal embankment lining & M15 concrete paving compaction", proof: "KSRSAC 3D Mesh Thickness Audit" },
+    { id: "c5", title: "Sluice gate electro-mechanical & flow telemetry calibration (Tier 4)", proof: "SCADA Discharge Sensor Verified" },
+    { id: "c6", title: "Cryptographic barometric elevation & joint radiographic weld audit (Tier 3)", proof: "SHA-256 NDT Radiography Stamp" },
+    { id: "c7", title: "Statutory 72-hour tranche withhold notice dispatched (CP-05)", proof: "Dispatched to Executive Engineer" },
+  ],
+  power: [
+    { id: "c1", title: "Transmission corridor geo-datum & tower footing benchmark (CP-01)", proof: "POSOCO Datum Geo-Lock Verified" },
+    { id: "c2", title: "Tower foundation stub setting, leg pitch & chimney casting (CP-02)", proof: "M20 Concrete Cube 28-day NABL Test" },
+    { id: "c3", title: "Conductor stringing sag & mid-span ground clearance audit (CP-04)", proof: "UAV LiDAR Minimum 8.5m Clearance" },
+    { id: "c4", title: "Substation transformer earthing resistance test (< 1.0 Ohm)", proof: "0.42 Ohm Earth Resistance Certified" },
+    { id: "c5", title: "Material yard conductor spool & steel lattice inventory (Tier 4)", proof: "420 MT Galvanized Tower Steel" },
+    { id: "c6", title: "Stratum-1 GPS & infrared thermography hot-spot scan (Tier 3)", proof: "SHA-256 FLIR Telemetry Stamp" },
+    { id: "c7", title: "Statutory Central Electricity Authority (CEA) compliance notice (CP-05)", proof: "Dispatched to SE Grid Operations" },
+  ],
+  telecom: [
+    { id: "c1", title: "Tower site lease benchmark & geodetic datum frozen (CP-01)", proof: "DoT WGS84 Antenna Datum Lock" },
+    { id: "c2", title: "Base foundation concrete compressive strength (IS 456 M25)", proof: "26.5 N/mm² NABL Certified" },
+    { id: "c3", title: "Lattice mast section erection, torque bolt & verticality audit (CP-04)", proof: "Theodolite Verticality 1:1000 Checked" },
+    { id: "c4", title: "Optical Fiber Cable (OFC) route trench depth & duct installation", proof: "1.2m Trench Depth Sensor Verified" },
+    { id: "c5", title: "OFC OTDR attenuation & splice loss test (< 0.22 dB/km) (Tier 4)", proof: "NABL OTDR Trace Logs Approved" },
+    { id: "c6", title: "Cryptographic GPS EXIF & EMF radiation compliance stamp (Tier 3)", proof: "SHA-256 Hardware Telemetry Stamp" },
+    { id: "c7", title: "Statutory 72-hour explanation show-cause notice dispatched (CP-05)", proof: "Dispatched to Circle Telecom Officer" },
+  ],
+  mining: [
+    { id: "c1", title: "Mining lease boundary pillars & DGMS geodetic datum frozen (CP-01)", proof: "DGMS Lease Boundary DGPS Stamp" },
+    { id: "c2", title: "Overburden (OB) dump slope stability & angle of repose audit", proof: "Slope Stability Radar (SSR) Verified" },
+    { id: "c3", title: "Volumetric pit excavation cut/fill photogrammetry (CP-04)", proof: "Drone RTK 3D Volumetric Mesh (m³)" },
+    { id: "c4", title: "Coal seam bench height & haul road width compliance (DGMS standard)", proof: "LiDAR Haul Road Width ≥ 3x Dumper" },
+    { id: "c5", title: "Coal stock depot weighbridge & physical stockpile survey (Tier 4)", proof: "Total Station 3D Stockpile Audit" },
+    { id: "c6", title: "Continuous Ambient Air Quality (CAAQMS) telemetry & environmental seal", proof: "CPCB Real-time Sensor Feed Stamp" },
+    { id: "c7", title: "Statutory 72-hour explanation show-cause notice dispatched (CP-05)", proof: "Dispatched to Area General Manager" },
+  ],
+  buildings: [
+    { id: "c1", title: "Site boundary benchmark & geodetic datum frozen (CP-01)", proof: "Survey of India WGS84 Datum Lock" },
+    { id: "c2", title: "Foundation concrete compressive core test (IS 456 M25 certified)", proof: "27.8 N/mm² NABL Certified" },
+    { id: "c3", title: "Superstructure column framework, rebar count & slab casting (CP-04)", proof: "4 of 24 Erected · Shortfall: 20" },
+    { id: "c4", title: "Volumetric earthwork & basement excavation photogrammetry (Drone RTK)", proof: "KSRSAC 2.2 cm/px 3D DSM Mesh" },
+    { id: "c5", title: "Material yard physical rebar & cement inventory (Tier 4)", proof: "160 MT Fe-550 Steel in Depot" },
+    { id: "c6", title: "Stratum-1 GPS & barometric elevation cryptographic EXIF (Tier 3)", proof: "SHA-256 e849f... Hardware Stamp" },
+    { id: "c7", title: "Statutory 72-hour explanation show-cause notice dispatched (CP-05)", proof: "Dispatched to Executive Engineer on Record" },
+  ],
+};
+
+export function getSectorCheckpoints(cat: SectorCategory) {
+  switch (cat) {
+    case "roads":
+      return [
+        { num: "04", name: "Ground & Drone Volumetric Photogrammetry" },
+        { num: "02", name: "Subgrade & Granular Sub-Base (GSB)" },
+        { num: "03", name: "Dense Bituminous Macadam (DBM) Paving" },
+        { num: "05", name: "Tranche Clearance & Roughness Profiling" },
+        { num: "01", name: "Right-of-Way & Alignment Geo-Lock" },
+      ];
+    case "railways":
+      return [
+        { num: "04", name: "OHE Mast & Track Corridor Drone Audit" },
+        { num: "02", name: "Formation & Blanketing Layer Compaction" },
+        { num: "03", name: "Ballast Cushion & Sleeper Spacing" },
+        { num: "05", name: "CRS Statutory Tranche Clearance" },
+        { num: "01", name: "RDSO Geodetic Track Alignment Lock" },
+      ];
+    case "water":
+      return [
+        { num: "04", name: "Ground & Drone Embankment Audit" },
+        { num: "02", name: "Trench Excavation & Sand Bedding" },
+        { num: "03", name: "Pipeline Hydrostatic Pressure Test" },
+        { num: "05", name: "SCADA Discharge & Tranche Clearance" },
+        { num: "01", name: "Intake & Corridor Easement Geo-Lock" },
+      ];
+    case "power":
+      return [
+        { num: "04", name: "Ground & UAV LiDAR Hot-Spot Audit" },
+        { num: "02", name: "Tower Footing & Stub Setting" },
+        { num: "03", name: "Conductor Stringing & Sag Clearance" },
+        { num: "05", name: "CEA Clearance & Tranche Release" },
+        { num: "01", name: "Corridor Baseline Geo-Lock" },
+      ];
+    case "telecom":
+      return [
+        { num: "04", name: "Mast Verticality & Drone Audit" },
+        { num: "02", name: "Base Foundation Concrete Core Test" },
+        { num: "03", name: "OFC Trenching & Duct Installation" },
+        { num: "05", name: "DoT Telecom Tranche Clearance" },
+        { num: "01", name: "Tower Site Lease & Antenna Datum Lock" },
+      ];
+    case "mining":
+      return [
+        { num: "04", name: "Drone RTK Volumetric DSM Audit" },
+        { num: "02", name: "Haul Road & Pit Bench Safety" },
+        { num: "03", name: "Overburden Dump Slope Stability" },
+        { num: "05", name: "Stockpile Audit & Tranche Release" },
+        { num: "01", name: "DGMS Lease Boundary Geo-Lock" },
+      ];
+    case "buildings":
+    default:
+      return [
+        { num: "04", name: "Ground & Drone Audit" },
+        { num: "02", name: "Substructure & Plinth Beam" },
+        { num: "03", name: "Superstructure Column Framework" },
+        { num: "05", name: "Tranche Clearance" },
+        { num: "01", name: "Baseline Geo-Lock" },
+      ];
+  }
+}
+
+export function getSectorAnomalies(cat: SectorCategory): string[] {
+  switch (cat) {
+    case "roads":
+      return [
+        "Chainage 24+400 to 28+100 DBM thickness shortfall (Measured: 32mm vs 50mm spec)",
+        "Volumetric earthwork DSM shows -18% cut/fill void on embankment slope",
+        "Subgrade compaction failed IRC:37 Proctor density (92.4% vs 98% required)",
+        "Right-of-Way boundary clearance deviation on chainage 14+200",
+        "Median crash barrier post spacing exceeds IRC limit by 40cm",
+      ];
+    case "railways":
+      return [
+        "Ballast cushion thickness deficit: 190mm vs 300mm standard",
+        "Overhead OHE mast erection deficit (Only 14 of 32 masts erected)",
+        "Track alignment gauge deviation detected on Curve C-04",
+        "Formation blanketing layer compaction density shortfall",
+        "Electronic interlocking cable duct trenching depth deficit (< 0.8m)",
+      ];
+    case "water":
+      return [
+        "Hydrostatic pressure drop detected: 3.2 bar loss over 6 hours",
+        "Trench bedding sand depth shortfall (70mm vs 150mm spec)",
+        "Canal embankment lining concrete crack along 340m stretch",
+        "DI pipeline joint radiographic NDT test pending clearance",
+        "Intake pump house sump excavation delayed by 45 days",
+      ];
+    case "power":
+      return [
+        "Tower #42 leg pitch alignment deviation exceeding 15mm tolerance",
+        "Conductor stringing mid-span sag ground clearance deficit (< 7.8m)",
+        "Substation transformer earthing resistance elevated (2.4 Ohm vs < 1.0 Ohm)",
+        "Tower footing concrete chimney cold joint defect detected",
+        "Galvanized tower steel inventory deficit in distribution yard",
+      ];
+    case "telecom":
+      return [
+        "Lattice tower verticality tilt exceeds 1:1000 structural limit",
+        "OFC duct burial depth shortfall along national highway section",
+        "Antenna mounting azimuth deviation of 18 degrees on sector 2",
+        "Tower anchor bolt torque inspection failed ASTM spec",
+        "Earthing pit resistance exceeds 2.0 Ohm safety threshold",
+      ];
+    case "mining":
+      return [
+        "Overburden dump bench slope angle exceeds DGMS 28-degree safety limit",
+        "Volumetric drone DSM shows -22% coal extraction shortfall",
+        "Haul road width constriction on North face (< 2.5x dumper width)",
+        "Environmental PM10 particulate telemetry exceeds CPCB limit",
+        "Boundary pillar #08 displaced from statutory lease coordinate",
+      ];
+    case "buildings":
+    default:
+      return [
+        "Only 4 of 24 pillars erected (Shortfall: 20 columns)",
+        "Volumetric earthwork DSM shows -18% cut/fill void",
+        "Fe-550 TMT steel rebar stock idle in yard (not cast)",
+        "Plinth concrete compressive strength pending NABL core test",
+        "Superstructure slab reinforcement spacing exceeds design drawings",
+      ];
+  }
+}
+
+export function getSectorCompliantFindings(cat: SectorCategory): string[] {
+  switch (cat) {
+    case "roads":
+      return [
+        "Bituminous concrete core thickness and IRC:37 subgrade density verified compliant",
+        "ISRO Cartosat-3 telemetry matches roadway embankment corridor bounds",
+        "Laser profilometer international roughness index (IRI) certified < 1.8 m/km",
+        "Drainage culvert barrel alignment and headwall casting verified to drawings",
+        "Sub-base compaction and layer thickness certified MoRTH Section 400 compliant",
+      ];
+    case "railways":
+      return [
+        "Track alignment, sleeper spacing, and RDSO ballast compaction verified within spec",
+        "OHE mast verticality, cantilever stagger, and contact wire height verified",
+        "Plate load test Ev2 formation compaction certified > 45 MPa",
+        "Electronic interlocking signalling loop resistance certified compliant",
+        "Drone corridor LiDAR confirms clearance envelope matches IRS schedule",
+      ];
+    case "water":
+      return [
+        "Hydrostatic pipeline pressure held at 12 bar for 24 hours with zero drop",
+        "Canal concrete lining compaction and joint sealant integrity verified",
+        "Pipeline sand bedding depth and backfill compaction verified compliant",
+        "Intake pump station intake manifold civil structure certified to design",
+        "SCADA ultrasonic flowmeter telemetry calibrated and verified compliant",
+      ];
+    case "power":
+      return [
+        "Transmission tower verticality and conductor ground clearance verified compliant",
+        "Tower stub footing concrete compressive test certified > 20 N/mm²",
+        "Substation transformer earth mat resistance verified < 0.5 Ohm",
+        "UAV infrared thermography scan confirms zero hot-spot temperature delta",
+        "Insulator string flashover clearance certified CEA safety compliant",
+      ];
+    case "telecom":
+      return [
+        "Lattice tower plumbness and antenna azimuth calibrated to telecom circle spec",
+        "Optical fiber OTDR trace logs confirm loss < 0.20 dB/km across section",
+        "Tower foundation concrete cube strength certified IS 456 M25 compliant",
+        "Earthing pit copper chemical grounding resistance verified < 1.0 Ohm",
+        "Cryptographic RF radiation exposure survey certified DoT compliant",
+      ];
+    case "mining":
+      return [
+        "Bench slope angle and drone volumetric pit surveys certified DGMS compliant",
+        "Haul road gradient, width, and safety berm dimensions verified compliant",
+        "Continuous ambient air quality particulate levels verified below CPCB norms",
+        "Overburden dump stability radar confirms zero slope displacement",
+        "DGPS statutory lease boundary coordinates verified and sealed",
+      ];
+    case "buildings":
+    default:
+      return [
+        "Physical progress corroborates remote sensor photogrammetry",
+        "ISRO Cartosat-3 telemetry matches foundation excavation bounds",
+        "NABL core compressive strength tests verified within spec",
+        "Superstructure foundation rebar density matches structural design",
+        "Sub-base compaction and layer thickness certified compliant",
+      ];
+  }
+}
+
+export function getShortfallReason(cat: SectorCategory): string {
+  switch (cat) {
+    case "roads":
+      return "until subgrade density, bituminous layers, and drainage culverts are certified.";
+    case "railways":
+      return "until track alignment, ballast cushion, and OHE masts are certified.";
+    case "water":
+      return "until hydrostatic pressure, trench backfill, and canal lining are certified.";
+    case "power":
+      return "until tower stubs, conductor sag, and earthing tests are certified.";
+    case "telecom":
+      return "until tower verticality, anchor bolts, and OFC ducting are certified.";
+    case "mining":
+      return "until pit slopes, haul road width, and volumetric surveys are certified.";
+    case "buildings":
+    default:
+      return "until columns, structural frame, and foundation tests are certified.";
+  }
+}
+
+export function getLabTestLabel(cat: SectorCategory) {
+  switch (cat) {
+    case "roads":
+      return { title: "Bitumen / Core Test", sub: "IRC:37 Core Test", cat: "Bitumen Lab Core Test (IRC:37)" };
+    case "railways":
+      return { title: "Ballast / Plate Test", sub: "RDSO / Ev2 Test", cat: "Ballast & Plate Load Test (RDSO)" };
+    case "water":
+      return { title: "Hydrostatic Test", sub: "IS 3589 Pressure", cat: "Hydrostatic Pressure Test (IS 3589)" };
+    case "power":
+      return { title: "Earthing / Sag Test", sub: "CEA Earth Resistance", cat: "Earthing & Sag Test (CEA)" };
+    case "telecom":
+      return { title: "OTDR / Loss Test", sub: "DoT Splice Logs", cat: "OTDR Loss Test (DoT)" };
+    case "mining":
+      return { title: "Slope Stability Test", sub: "DGMS SSR Radar", cat: "Slope Stability Test (DGMS)" };
+    case "buildings":
+    default:
+      return { title: "Lab Core Test", sub: "NABL Certificate", cat: "Concrete Lab Test (IS 456 M25)" };
+  }
+}
+
+const STORAGE_KEY_CHECKLISTS = "drishti_inspections_checked_state";
+const STORAGE_KEY_SELECTED_INSP = "drishti_selected_inspection_id";
 
 export default function Inspections() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialProjectId = searchParams.get("projectId");
 
   const [projectsList, setProjectsList] = useState<Project[]>([]);
@@ -49,22 +368,49 @@ export default function Inspections() {
   const [filterTier, setFilterTier] = useState<AuditTier>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedState, setSelectedState] = useState("all");
-  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(() => {
+    return initialProjectId
+      ? `INS-2026-${initialProjectId}`
+      : localStorage.getItem(STORAGE_KEY_SELECTED_INSP);
+  });
 
-  // Checklists state (per inspection ID)
-  const [checkedState, setCheckedState] = useState<Record<string, Record<string, boolean>>>({});
+  // Checklists state (per inspection ID) persisted in localStorage
+  const [checkedState, setCheckedState] = useState<Record<string, Record<string, boolean>>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CHECKLISTS);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to load checklist state", e);
+    }
+    return {};
+  });
 
   // Modals state
   const [modalType, setModalType] = useState<"upload" | "schedule" | "notice" | null>(null);
   const [uploadCategory, setUploadCategory] = useState("Photo");
 
-  // Load real projects from backend
+  // Load real projects and MongoDB checklists from backend
   useEffect(() => {
     projectService
       .getProjects()
       .then((res) => {
         const list = res.results || [];
         setProjectsList(list);
+
+        // Hydrate checkedState directly from MongoDB Atlas
+        const mongoChecks: Record<string, Record<string, boolean>> = {};
+        list.forEach((p) => {
+          if (p.inspection_checklist && Object.keys(p.inspection_checklist).length > 0) {
+            mongoChecks[`INS-2026-${p.project_id}`] = p.inspection_checklist;
+          }
+        });
+
+        if (Object.keys(mongoChecks).length > 0) {
+          setCheckedState((prev) => ({
+            ...prev,
+            ...mongoChecks,
+          }));
+        }
       })
       .catch((err) => {
         console.error("Failed to load projects for inspections:", err);
@@ -74,17 +420,18 @@ export default function Inspections() {
       });
   }, []);
 
-  // Generate enriched statutory inspection list
+  // Generate enriched statutory inspection list (deterministic from project_id)
   const inspections: InspectionItem[] = useMemo(() => {
     if (projectsList.length === 0) {
       // Fallback baseline projects
       return [
         {
-          id: "INS-2026-DR0001",
+          id: "INS-2026-DR-0001",
           project: "DR-0001",
           name: "Delhi-Amritsar-Katra Expressway Phase-I (Punjab Section)",
           state: "Punjab",
           department: "Roads & Highways",
+          sector: "Roads & Highways",
           claimedProgress: 42.0,
           auditedProgress: 16.0,
           progressGap: 26.0,
@@ -93,41 +440,64 @@ export default function Inspections() {
           division: "KES / NHAI Div-IV",
           date: "18 Sep 2026",
           status: "Flagged Divergence",
-          checkpoint: "Ground & Drone Audit",
+          checkpoint: "Ground & Drone Volumetric Photogrammetry",
           checkpointNum: "04",
           trancheHeldCr: 390.71,
           tier: "Tier 3: Ground",
-          anomalyFinding: "Only 4 of 24 pillars standing (Shortfall: 20 columns)",
+          anomalyFinding: "Chainage 24+400 to 28+100 DBM thickness shortfall (Measured: 32mm vs 50mm spec)",
           evidenceCount: 24,
         },
       ];
     }
 
     return projectsList.map((p, idx) => {
-      const claimed = p.reported_progress != null ? Number(p.reported_progress) : 38.5;
-      
-      // Determine authentic audit divergence
-      const isHighDivergence = idx % 3 === 0 || claimed > 30;
-      const audited = isHighDivergence ? Math.max(8.0, Number((claimed * 0.42).toFixed(1))) : claimed;
-      const gap = Number((claimed - audited).toFixed(1));
+      // Deterministic numeric seed from project_id (e.g. DR-0005 -> 5)
+      const idMatch = p.project_id.match(/\d+/);
+      const idNum = idMatch ? parseInt(idMatch[0], 10) : idx + 1;
 
-      const statuses: InspectionItem["status"][] = [
-        "Flagged Divergence",
-        "Review Required",
+      const claimed = p.reported_progress != null ? Number(p.reported_progress) : 38.5;
+      const sector = p.sector || p.department || "Roads & Highways";
+      const cat = resolveSectorCategory(sector, p.project_name);
+      
+      // Deterministic Calibrated Criteria (~20-25% of audited sites):
+      // 1. Isolation Forest ML Anomaly flag
+      // 2. High systematic risk score (>= 40)
+      // 3. Periodic targeted sample audit (every 5th site with claimed progress > 25%)
+      const hasMLAnomaly = Boolean(p.anomaly_flag);
+      const isHighRisk = p.risk_score != null && p.risk_score >= 40;
+      const isSampleAudit = idNum % 5 === 0 && claimed > 25;
+      const isHighDivergence = hasMLAnomaly || isHighRisk || isSampleAudit;
+
+      let audited: number;
+      let gap: number;
+
+      if (isHighDivergence) {
+        // High divergence: ground physical audit reveals divergence exceeding statutory 15% threshold
+        audited = Math.max(5.0, Number((claimed * 0.45).toFixed(1)));
+        gap = Number((claimed - audited).toFixed(1));
+        if (gap < 16.0) {
+          gap = 16.5;
+          audited = Math.max(0.0, Number((claimed - gap).toFixed(1)));
+        }
+      } else {
+        // Normal compliant audit: within standard operational tolerance (1.5% - 7.4% divergence)
+        const minorVariance = Number(((((idNum * 13) % 60) + 15) / 10).toFixed(1));
+        gap = minorVariance;
+        audited = Math.max(0.0, Number((claimed - gap).toFixed(1)));
+      }
+
+      const nonFlaggedStatuses: InspectionItem["status"][] = [
         "In Progress",
+        "Review Required",
         "Assigned",
         "Completed",
       ];
-      const status: InspectionItem["status"] = gap >= 15 ? "Flagged Divergence" : statuses[idx % statuses.length];
+      const status: InspectionItem["status"] = isHighDivergence
+        ? "Flagged Divergence"
+        : nonFlaggedStatuses[idNum % nonFlaggedStatuses.length];
 
-      const checkpoints = [
-        { num: "04", name: "Ground & Drone Audit" },
-        { num: "02", name: "Substructure & Plinth" },
-        { num: "03", name: "Contractor Invoiced Claim" },
-        { num: "05", name: "Tranche Clearance" },
-        { num: "01", name: "Baseline Geo-Lock" },
-      ];
-      const cp = gap >= 15 ? checkpoints[0] : checkpoints[idx % checkpoints.length];
+      const checkpoints = getSectorCheckpoints(cat);
+      const cp = status === "Flagged Divergence" ? checkpoints[0] : checkpoints[idNum % checkpoints.length];
 
       const tiers: InspectionItem["tier"][] = [
         "Tier 3: Ground",
@@ -135,98 +505,202 @@ export default function Inspections() {
         "Tier 1: Space",
         "Tier 4: Treasury",
       ];
-      const tier = tiers[idx % tiers.length];
+      const tier = tiers[idNum % tiers.length];
 
-      const officers = [
-        { name: "S. Venkatesh", div: "KES / NHAI Div-IV" },
-        { name: "K. Rajan", div: "CPWD Civil Zone 1" },
-        { name: "S. Nair", div: "State PWD Oversight" },
-        { name: "P. Kumar", div: "Rail Vikas Nigam QA" },
-        { name: "M. Reddy", div: "KSRSAC Geo-Division" },
-        { name: "Ananya Roy", div: "MoRTH Technical Wing" },
-      ];
-      const officer = officers[idx % officers.length];
+      const sectorOfficers: Record<SectorCategory, { name: string; div: string }[]> = {
+        roads: [
+          { name: "S. Venkatesh", div: "NHAI Project Div-IV" },
+          { name: "Ananya Roy", div: "MoRTH Technical Wing" },
+          { name: "P. Sharma", div: "State PWD Highways" },
+        ],
+        railways: [
+          { name: "P. Kumar", div: "Rail Vikas Nigam QA" },
+          { name: "S. Nair", div: "RDSO Track Standards" },
+          { name: "V. Pillai", div: "IRCON Infrastructure" },
+        ],
+        water: [
+          { name: "R. Sengupta", div: "Jal Jeevan Mission QA" },
+          { name: "M. Reddy", div: "Water Resources Dept" },
+          { name: "K. Sen", div: "CWC Hydro-Audit" },
+        ],
+        power: [
+          { name: "A. Mathur", div: "PGCIL Grid Operations" },
+          { name: "D. Banerjee", div: "State Transco Oversight" },
+          { name: "H. Patel", div: "CEA Transmission Wing" },
+        ],
+        telecom: [
+          { name: "N. Joshi", div: "DoT Telecom Enforcement" },
+          { name: "S. Gill", div: "USOF Optical Network" },
+          { name: "R. Bhatia", div: "BSNL Infrastructure" },
+        ],
+        mining: [
+          { name: "B. Soren", div: "DGMS Mining Oversight" },
+          { name: "T. Mandal", div: "CMPDI Volumetric Desk" },
+          { name: "G. Das", div: "Coal India QA Cell" },
+        ],
+        buildings: [
+          { name: "K. Rajan", div: "CPWD Civil Zone 1" },
+          { name: "S. Nair", div: "State PWD Oversight" },
+          { name: "R. Verma", div: "NBCC Project Wing" },
+        ],
+      };
+      const officersList = sectorOfficers[cat] || sectorOfficers.roads;
+      const officer = officersList[idNum % officersList.length];
 
       const totalCostCr = p.revised_cost_cr || p.original_cost_cr || 850;
-      const trancheHeld = gap > 0 ? Number(((totalCostCr * gap) / 100).toFixed(2)) : 0;
+      // Tranche withholding legally enforced on flagged divergence pending resolution
+      const trancheHeld = status === "Flagged Divergence" ? Number(((totalCostCr * gap) / 100).toFixed(2)) : 0;
 
-      const anomalies = [
-        "Only 4 of 24 pillars erected (Shortfall: 20 columns)",
-        "Volumetric earthwork DSM shows -18% cut/fill void",
-        "Fe-550 TMT steel rebar stock idle in yard (not cast)",
-        "Plinth concrete compressive strength pending NABL core test",
-        "Right-of-Way boundary clearance deviation on chainage 14+200",
-      ];
+      const anomalies = getSectorAnomalies(cat);
+      const compliantFindings = getSectorCompliantFindings(cat);
+      const finding = status === "Flagged Divergence"
+        ? anomalies[idNum % anomalies.length]
+        : compliantFindings[idNum % compliantFindings.length];
 
       return {
         id: `INS-2026-${p.project_id}`,
         project: p.project_id,
         name: p.project_name,
         state: p.state || "National",
-        department: p.department || p.sector || "Infrastructure",
+        department: p.department || sector,
+        sector,
         claimedProgress: Number(claimed.toFixed(1)),
         auditedProgress: Number(audited.toFixed(1)),
         progressGap: gap,
-        risk: p.risk_score || (gap >= 15 ? 85 : 55),
+        risk: p.risk_score || (isHighDivergence ? 85 : 42),
         assigned: officer.name,
         division: officer.div,
-        date: `${12 + (idx % 14)} Sep 2026`,
+        date: `${12 + (idNum % 14)} Sep 2026`,
         status,
         checkpoint: cp.name,
         checkpointNum: cp.num,
         trancheHeldCr: trancheHeld,
         tier,
-        anomalyFinding: anomalies[idx % anomalies.length],
-        evidenceCount: 12 + (idx % 15),
+        anomalyFinding: finding,
+        evidenceCount: 12 + (idNum % 15),
       };
     });
   }, [projectsList]);
 
-  // Set default selected inspection
+  // Set default selected inspection (preserving user selection across refresh)
   useEffect(() => {
-    if (inspections.length > 0 && !selectedInspectionId) {
-      if (initialProjectId) {
-        const found = inspections.find((i) => i.project === initialProjectId);
+    if (inspections.length > 0) {
+      const targetId = initialProjectId
+        ? `INS-2026-${initialProjectId}`
+        : (selectedInspectionId || localStorage.getItem(STORAGE_KEY_SELECTED_INSP));
+
+      if (targetId) {
+        const found = inspections.find((i) => i.id === targetId || i.project === targetId);
         if (found) {
-          setSelectedInspectionId(found.id);
+          if (selectedInspectionId !== found.id) {
+            setSelectedInspectionId(found.id);
+          }
           return;
         }
       }
-      // Prefer first flagged divergence
-      const firstFlagged = inspections.find((i) => i.status === "Flagged Divergence");
-      setSelectedInspectionId(firstFlagged ? firstFlagged.id : inspections[0].id);
+
+      if (!selectedInspectionId || !inspections.find((i) => i.id === selectedInspectionId)) {
+        const firstFlagged = inspections.find((i) => i.status === "Flagged Divergence");
+        const defaultId = firstFlagged ? firstFlagged.id : inspections[0].id;
+        setSelectedInspectionId(defaultId);
+        try {
+          localStorage.setItem(STORAGE_KEY_SELECTED_INSP, defaultId);
+        } catch (e) {}
+      }
     }
-  }, [inspections, initialProjectId, selectedInspectionId]);
+  }, [inspections, initialProjectId]);
 
   // Currently selected inspection
   const selectedInspection = useMemo(() => {
     return inspections.find((i) => i.id === selectedInspectionId) || inspections[0];
   }, [inspections, selectedInspectionId]);
 
-  // Checklist handler
+  // Dynamic Sector Category for currently selected inspection
+  const selectedSectorCat = useMemo((): SectorCategory => {
+    if (!selectedInspection) return "roads";
+    return resolveSectorCategory(selectedInspection.sector || selectedInspection.department, selectedInspection.name);
+  }, [selectedInspection]);
+
+  // Sector-tailored Section 65B Checklist
+  const currentChecklist = useMemo(() => {
+    return sectorChecklists[selectedSectorCat] || sectorChecklists.roads;
+  }, [selectedSectorCat]);
+
+  // Checklist handler with localStorage persistence and status-aware baseline
   const isChecked = (itemId: string) => {
     if (!selectedInspection) return false;
-    const projectChecks = checkedState[selectedInspection.id] || {};
-    // Default initial checked state (first 2 items passed in baseline)
-    if (projectChecks[itemId] !== undefined) return projectChecks[itemId];
-    return itemId === "c1" || itemId === "c2";
+    const projectChecks = checkedState[selectedInspection.id];
+    if (projectChecks && projectChecks[itemId] !== undefined) {
+      return projectChecks[itemId];
+    }
+    
+    // Status-appropriate default initial verified items:
+    // Completed: all items (c1 to c7) passed
+    // Review Required: c1 to c5 passed
+    // In Progress: c1 to c4 passed
+    // Flagged Divergence: only c1 and c2 passed (subsequent checkpoints failed)
+    // Assigned: only c1 passed
+    switch (selectedInspection.status) {
+      case "Completed":
+        return true;
+      case "Review Required":
+        return ["c1", "c2", "c3", "c4", "c5"].includes(itemId);
+      case "In Progress":
+        return ["c1", "c2", "c3", "c4"].includes(itemId);
+      case "Flagged Divergence":
+        return ["c1", "c2"].includes(itemId);
+      case "Assigned":
+      default:
+        return itemId === "c1";
+    }
   };
+
+  const [syncingMongo, setSyncingMongo] = useState(false);
 
   const toggleCheck = (itemId: string) => {
     if (!selectedInspection) return;
     const currentVal = isChecked(itemId);
-    setCheckedState((prev) => ({
-      ...prev,
-      [selectedInspection.id]: {
-        ...(prev[selectedInspection.id] || {}),
-        [itemId]: !currentVal,
-      },
-    }));
+    const inspectionId = selectedInspection.id;
+    const projectId = selectedInspection.project;
+
+    // Snapshot full updated checks for all current checklist items
+    const updatedChecks: Record<string, boolean> = {};
+    currentChecklist.forEach((c) => {
+      updatedChecks[c.id] = c.id === itemId ? !currentVal : isChecked(c.id);
+    });
+
+    // 1. Optimistic React & local state update
+    setCheckedState((prev) => {
+      const updated = {
+        ...prev,
+        [inspectionId]: updatedChecks,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY_CHECKLISTS, JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to save checkedState to localStorage", e);
+      }
+      return updated;
+    });
+
+    // 2. Persist directly to MongoDB Atlas
+    setSyncingMongo(true);
+    projectService
+      .saveChecklist(projectId, updatedChecks)
+      .then(() => {
+        console.log(`Saved checklist for ${projectId} to MongoDB Atlas.`);
+      })
+      .catch((err) => {
+        console.warn(`Could not save checklist to MongoDB Atlas, cached locally:`, err);
+      })
+      .finally(() => {
+        setTimeout(() => setSyncingMongo(false), 400);
+      });
   };
 
   const completedCount = useMemo(() => {
-    return defaultChecklist.filter((c) => isChecked(c.id)).length;
-  }, [selectedInspection, checkedState]);
+    return currentChecklist.filter((c) => isChecked(c.id)).length;
+  }, [currentChecklist, selectedInspection, checkedState]);
 
   // Unique states for filter
   const stateOptions = useMemo(() => {
@@ -264,43 +738,10 @@ export default function Inspections() {
 
   return (
     <div className="bg-[#f0f4f9] min-h-screen text-slate-800 font-sans pb-16">
-      {/* Top Breadcrumb Bar (Matching Evidence page) */}
-      <div className="bg-[#0b1f4b] text-white px-6 py-2.5 flex flex-wrap items-center justify-between text-xs border-b border-navy-800 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-white/60 cursor-pointer hover:underline" onClick={() => navigate("/dashboard")}>
-            Home
-          </span>
-          <span className="text-white/40">›</span>
-          <span className="text-white/60">Oversight Operations</span>
-          <span className="text-white/40">›</span>
-          <span className="text-white font-semibold">Field Inspection Management</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="bg-sky-500/20 text-sky-300 px-2.5 py-0.5 rounded font-mono font-medium border border-sky-400/30">
-            INSPECTION AUDIT GRID v2.4
-          </span>
-          <span className="bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded font-mono font-bold border border-amber-400/30">
-            ROSTER: {inspections.length} AUDITS
-          </span>
-          <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>NIC Certified Section 65B</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-[1440px] mx-auto px-6 pt-5">
+      <div className="max-w-[1440px] mx-auto px-6 pt-6">
         {/* Main Header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div className="max-w-[820px]">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="bg-[#0b1f4b] text-white font-mono font-bold text-[11px] px-2.5 py-0.5 rounded">
-                STATUTORY PHYSICAL AUDIT PROTOCOL
-              </span>
-              <span className="bg-emerald-100 text-emerald-800 font-bold text-[11px] px-2 py-0.5 rounded border border-emerald-300">
-                ● LIVE CORROBORATION ENGINE
-              </span>
-            </div>
             <h1 className="text-2xl font-black text-[#0b1f4b] tracking-tight leading-snug">
               Field Inspection & Ground Truth Management
             </h1>
@@ -499,7 +940,13 @@ export default function Inspections() {
                     return (
                       <tr
                         key={insp.id}
-                        onClick={() => setSelectedInspectionId(insp.id)}
+                        onClick={() => {
+                          setSelectedInspectionId(insp.id);
+                          try {
+                            localStorage.setItem(STORAGE_KEY_SELECTED_INSP, insp.id);
+                          } catch (e) {}
+                          setSearchParams({ projectId: insp.project });
+                        }}
                         className={`transition-colors cursor-pointer ${
                           isSelected ? "bg-sky-50/60 ring-1 ring-inset ring-sky-300" : "hover:bg-slate-50/80"
                         }`}
@@ -690,7 +1137,7 @@ export default function Inspections() {
                       <span>Audit: {selectedInspection.auditedProgress}%</span>
                     </div>
                     <div className="text-[11px] text-rose-800 leading-tight">
-                      <strong>Audit Shortfall: -{selectedInspection.progressGap}%</strong> · ₹{selectedInspection.trancheHeldCr} Cr withheld at Checkpoint 05 until columns and earthwork are certified.
+                      <strong>Audit Shortfall: -{selectedInspection.progressGap}%</strong> · ₹{selectedInspection.trancheHeldCr} Cr withheld at Checkpoint 05 {getShortfallReason(selectedSectorCat)}
                     </div>
                   </div>
                 </div>
@@ -700,23 +1147,38 @@ export default function Inspections() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-xs font-black uppercase tracking-wider text-[#0b1f4b] flex items-center gap-1.5">
                       <span>⚖️</span> Section 65B Audit Checklist
+                      <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-bold uppercase tracking-wider border border-slate-200">
+                        {selectedSectorCat.toUpperCase()} PROTOCOL
+                      </span>
                     </div>
-                    <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      {completedCount}/{defaultChecklist.length} Verified
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {syncingMongo ? (
+                        <span className="text-[10px] font-mono text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 animate-pulse">
+                          Syncing to MongoDB...
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                          MongoDB Synced
+                        </span>
+                      )}
+                      <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {completedCount}/{currentChecklist.length} Verified
+                      </span>
+                    </div>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mb-3">
                     <div
                       className="bg-emerald-600 h-full transition-all duration-300"
-                      style={{ width: `${(completedCount / defaultChecklist.length) * 100}%` }}
+                      style={{ width: `${(completedCount / currentChecklist.length) * 100}%` }}
                     />
                   </div>
 
                   {/* Checklist Items */}
                   <div className="space-y-2">
-                    {defaultChecklist.map((item) => {
+                    {currentChecklist.map((item) => {
                       const done = isChecked(item.id);
                       return (
                         <div
@@ -787,19 +1249,24 @@ export default function Inspections() {
                       </div>
                     </div>
 
-                    <div
-                      onClick={() => {
-                        setUploadCategory("Concrete Lab Test (IS 456 M25)");
-                        setModalType("upload");
-                      }}
-                      className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-sky-50/50 hover:border-sky-300 cursor-pointer transition-all flex items-center gap-2"
-                    >
-                      <span className="text-lg">🧪</span>
-                      <div>
-                        <div className="font-bold text-slate-800">Lab Core Test</div>
-                        <div className="text-[9px] text-slate-400">NABL Certificate</div>
-                      </div>
-                    </div>
+                    {(() => {
+                      const lab = getLabTestLabel(selectedSectorCat);
+                      return (
+                        <div
+                          onClick={() => {
+                            setUploadCategory(lab.cat);
+                            setModalType("upload");
+                          }}
+                          className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-sky-50/50 hover:border-sky-300 cursor-pointer transition-all flex items-center gap-2"
+                        >
+                          <span className="text-lg">🧪</span>
+                          <div>
+                            <div className="font-bold text-slate-800">{lab.title}</div>
+                            <div className="text-[9px] text-slate-400">{lab.sub}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div
                       onClick={() => {
@@ -946,9 +1413,11 @@ export default function Inspections() {
                   <div>
                     <label className="block text-slate-700 font-bold mb-1">Audit Checkpoint Scope</label>
                     <select className="w-full p-2 rounded-lg border border-slate-300 font-medium">
-                      <option>Checkpoint 04: Ground Column Count & Drone DSM</option>
-                      <option>Checkpoint 02: Foundation Concrete Compressive Core Test</option>
-                      <option>Checkpoint 01: Baseline Geodetic Datum Benchmark Lock</option>
+                      {getSectorCheckpoints(selectedSectorCat).map((cp) => (
+                        <option key={cp.num}>
+                          Checkpoint {cp.num}: {cp.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>

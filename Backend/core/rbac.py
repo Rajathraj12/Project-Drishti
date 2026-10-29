@@ -19,8 +19,13 @@ PUBLIC_PROJECT_FIELDS = (
     'latitude',
     'longitude',
     'original_cost',
+    'original_cost_cr',
     'revised_cost',
+    'revised_cost_cr',
+    'expenditure',
+    'expenditure_cr',
     'reported_progress',
+    'reported_progress_pct',
     'data_source_type',
     'verification_status',
     'is_public',
@@ -59,7 +64,7 @@ CAPABILITIES = {
     },
     'manage_users': {Role.ADMIN},
     'write_project': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
-    'create_project': {Role.ADMIN},
+    'create_project': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'view_contractors': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
     'view_inspections': {Role.ADMIN, Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER},
     'view_internal_reports': {Role.ADMIN, Role.GOVERNMENT_OFFICER},
@@ -151,28 +156,63 @@ def state_query_clause(user_state):
     if not user_state:
         return user_state
     s = str(user_state).strip()
-    if s.upper() == 'HP':
-        return {'': ['HP', 'Himachal Pradesh']}
-    if s.upper() == 'PB':
-        return {'': ['PB', 'Punjab']}
-    return user_state
+    if s.upper() == 'HP' or s.lower() == 'himachal pradesh':
+        return {'$in': ['HP', 'Himachal Pradesh']}
+    if s.upper() == 'PB' or s.lower() == 'punjab':
+        return {'$in': ['PB', 'Punjab']}
+    if s.upper() == 'KA' or s.lower() == 'karnataka':
+        return {'$in': ['KA', 'Karnataka']}
+    if s.upper() == 'DL' or s.lower() == 'delhi':
+        return {'$in': ['DL', 'Delhi']}
+    return s
+
+def is_central_ministry(user):
+    dept = getattr(user, 'department', None)
+    if not dept:
+        return False
+    d = str(dept).strip().lower()
+    return 'ministry' in d or 'central' in d or 'mospi' in d
+
+def dept_matches(user_dept, project_dept_or_sector):
+    if not user_dept or not project_dept_or_sector:
+        return True
+    ud = str(user_dept).strip().lower()
+    pd = str(project_dept_or_sector).strip().lower()
+    if ud == pd or ud in pd or pd in ud:
+        return True
+    if ('highway' in ud or 'road' in ud or 'nhai' in ud or 'morth' in ud) and ('road' in pd or 'highway' in pd):
+        return True
+    if 'rail' in ud and 'rail' in pd:
+        return True
+    if ('power' in ud or 'energy' in ud or 'electric' in ud) and ('power' in pd or 'energy' in pd or 'electric' in pd):
+        return True
+    return False
+
 
 def matches_jurisdiction(user, project_doc):
-    if user.state and project_doc.get('state') and not state_matches(user.state, project_doc.get('state')):
-        return False
-    if user.district and project_doc.get('district') and user.district != project_doc.get('district'):
-        return False
     dept = project_doc.get('department') or project_doc.get('sector')
-    if user.department and dept and user.department != dept:
+    if user.department and dept and not dept_matches(user.department, dept):
+        return False
+    # Central ministries have nationwide jurisdiction across all states
+    if is_central_ministry(user):
+        return True
+    if user.state and project_doc.get('state') and not state_matches(user.state, project_doc.get('state')):
         return False
     return True
 
 
 def user_can_access_project(user, project, *, for_corrective_action=False):
     """Object-level project visibility. Fail closed when scope is unset."""
-    if not user or not getattr(user, 'is_authenticated', False):
-        return False
     doc = project_as_dict(project)
+    if not doc:
+        return False
+    if doc.get('data_source_type') == 'SYNTHETIC_DEMO':
+        return False
+
+    if not user or not getattr(user, 'is_authenticated', False):
+        if for_corrective_action:
+            return False
+        return is_public_project(doc)
     if not doc:
         return False
     if doc.get('data_source_type') == 'SYNTHETIC_DEMO':
@@ -188,18 +228,9 @@ def user_can_access_project(user, project, *, for_corrective_action=False):
     assigned = assigned_project_ids(user)
     project_id = doc.get('project_id')
 
-    if role == Role.GOVERNMENT_OFFICER:
-        if assigned:
-            if project_id not in assigned:
-                return False
-        return matches_jurisdiction(user, doc)
-
-    if role == Role.FIELD_OFFICER:
-        if assigned:
-            if project_id not in assigned:
-                return False
-        elif not (user.state or user.district or user.department):
-            return False
+    if role in (Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER):
+        if assigned and project_id in assigned:
+            return True
         return matches_jurisdiction(user, doc)
 
     return False
@@ -211,7 +242,7 @@ def check_user_project_scope(user, project_doc, *, for_corrective_action=False):
     if user_can_access_project(user, project_doc, for_corrective_action=for_corrective_action):
         return True, ""
     role = get_role(user)
-    if role == Role.CITIZEN:
+    if role in (Role.CITIZEN, None):
         return False, "Forbidden: Citizens do not have access to this resource."
     if role in (Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER):
         return False, "Forbidden: Project outside user jurisdiction"
@@ -271,30 +302,43 @@ def mongo_project_query(user):
         return {'data_source_type': 'OFFICIAL'}
 
     assigned = list(assigned_project_ids(user))
-    if role == Role.GOVERNMENT_OFFICER:
+    if role in (Role.GOVERNMENT_OFFICER, Role.FIELD_OFFICER):
         query = {'data_source_type': {'$ne': 'SYNTHETIC_DEMO'}}
+        jurisdiction_or = []
         if assigned:
-            query['project_id'] = {'$in': assigned}
+            jurisdiction_or.append({'project_id': {'$in': assigned}})
+            
+        state_cond = {}
         if user.state:
-            query['state'] = state_query_clause(user.state)
-        if user.district:
-            query['district'] = user.district
+            state_cond['state'] = state_query_clause(user.state)
+        
+        dept_cond = []
         if user.department:
-            query['$or'] = [{'department': user.department}, {'sector': user.department}]
-        return query
-
-    if role == Role.FIELD_OFFICER:
-        query = {'data_source_type': {'$ne': 'SYNTHETIC_DEMO'}}
-        if assigned:
-            query['project_id'] = {'$in': assigned}
-        elif not (user.state or user.district or user.department):
-            return {'_id': {'$exists': False}}
-        if user.state:
-            query['state'] = state_query_clause(user.state)
-        if user.district:
-            query['district'] = user.district
-        if user.department:
-            query['$or'] = [{'department': user.department}, {'sector': user.department}]
+            ud = user.department.lower()
+            if 'road' in ud or 'highway' in ud or 'nhai' in ud or 'morth' in ud:
+                dept_cond = [{'sector': {'$regex': 'road|highway', '$options': 'i'}}, {'department': {'$regex': 'road|highway', '$options': 'i'}}]
+            elif 'rail' in ud:
+                dept_cond = [{'sector': {'$regex': 'rail', '$options': 'i'}}, {'department': {'$regex': 'rail', '$options': 'i'}}]
+            elif 'power' in ud or 'energy' in ud:
+                dept_cond = [{'sector': {'$regex': 'power|energy', '$options': 'i'}}, {'department': {'$regex': 'power|energy', '$options': 'i'}}]
+            else:
+                dept_cond = [{'department': user.department}, {'sector': user.department}]
+                
+        # Central ministry officers have nationwide jurisdiction for their sector
+        if is_central_ministry(user):
+            if dept_cond:
+                jurisdiction_or.append({'$or': dept_cond})
+        elif state_cond:
+            jur_entry = dict(state_cond)
+            if dept_cond:
+                jur_entry['$or'] = dept_cond
+            jurisdiction_or.append(jur_entry)
+        elif dept_cond:
+            jurisdiction_or.append({'$or': dept_cond})
+            
+        if jurisdiction_or:
+            query['$or'] = jurisdiction_or
+            
         return query
 
     return {'_id': {'$exists': False}}
@@ -327,8 +371,13 @@ def sanitize_project_payload(user, payload):
         public['district'] = data.get('district', '')
         public['sector'] = data.get('sector')
         public['original_cost'] = data.get('original_cost')
+        public['original_cost_cr'] = data.get('original_cost_cr') or data.get('original_cost')
         public['revised_cost'] = data.get('revised_cost')
+        public['revised_cost_cr'] = data.get('revised_cost_cr') or data.get('revised_cost')
+        public['expenditure'] = data.get('expenditure')
+        public['expenditure_cr'] = data.get('expenditure_cr') or data.get('expenditure')
         public['reported_progress'] = data.get('reported_progress')
+        public['reported_progress_pct'] = data.get('reported_progress_pct') or data.get('reported_progress')
         public['data_source_type'] = data.get('data_source_type')
         public['source_project_id'] = data.get('source_project_id')
         public['verification_status'] = data.get('verification_status')
