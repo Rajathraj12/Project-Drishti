@@ -54,6 +54,8 @@ export default function CitizenReport() {
   const [isLocating, setIsLocating] = useState(false)
   const [locateStatus, setLocateStatus] = useState<string | null>(null)
   const [isCopied, setIsCopied] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Restore saved form draft if returning after login
   useEffect(() => {
@@ -128,22 +130,32 @@ export default function CitizenReport() {
     )
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitError(null)
+
     const citizenContact = user
       ? `${user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user.username} (${user.email || 'Citizen'})`
       : "Guest Citizen (Public Whistleblower)"
 
-    const report = citizenReportService.submitReport({
-      projectId: form.projectId,
-      issueType: form.issueType,
-      description: form.description,
-      location: form.location,
-      photoName: photoName || undefined,
-      citizenContact,
-    })
-    setGeneratedRef(report.referenceNo)
-    setStep("submitted")
+    try {
+      const report = await citizenReportService.submitReport({
+        projectId: form.projectId,
+        issueType: form.issueType,
+        description: form.description,
+        location: form.location,
+        photoName: photoName || undefined,
+        citizenContact,
+      })
+      setGeneratedRef(report.referenceNo)
+      setStep("submitted")
+    } catch (err) {
+      console.error("[CitizenReport] submit error:", err)
+      setSubmitError("Failed to submit report. Please check your connection and try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleCopyRef = () => {
@@ -453,12 +465,27 @@ export default function CitizenReport() {
         </div>
 
         {/* Form Submission Button */}
+        {submitError && (
+          <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3.5 py-2.5 font-medium">
+            {submitError}
+          </div>
+        )}
         <button
           type="submit"
-          className="w-full bg-[#0b1f4b] hover:bg-[#122e6e] text-white py-3 rounded-xl font-semibold text-xs sm:text-sm transition shadow-xs cursor-pointer flex items-center justify-center gap-2"
+          disabled={isSubmitting}
+          className="w-full bg-[#0b1f4b] hover:bg-[#122e6e] disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl font-semibold text-xs sm:text-sm transition shadow-xs cursor-pointer flex items-center justify-center gap-2"
         >
-          <span>Submit Grievance Report</span>
-          <ArrowRightIcon size={14} />
+          {isSubmitting ? (
+            <>
+              <SpinnerIcon size={14} />
+              <span>Submitting...</span>
+            </>
+          ) : (
+            <>
+              <span>Submit Grievance Report</span>
+              <ArrowRightIcon size={14} />
+            </>
+          )}
         </button>
       </form>
     </div>

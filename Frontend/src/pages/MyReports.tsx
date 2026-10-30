@@ -230,10 +230,13 @@ function ReportCard({
       status: newStatus,
       resolvedNote: finalNote,
       assignedOfficer: report.assignedOfficer || officerName,
+    }).then(() => {
+      setSuccessMsg(`Status updated to "${newStatus}". Redressal pipeline updated.`)
+      setTimeout(() => setSuccessMsg(null), 3500)
+    }).catch(() => {
+      setSuccessMsg("Update failed. Please try again.")
+      setTimeout(() => setSuccessMsg(null), 3500)
     })
-
-    setSuccessMsg(`Status updated to "${newStatus}". Redressal pipeline updated.`)
-    setTimeout(() => setSuccessMsg(null), 3500)
   }
 
   const handleSaveNote = () => {
@@ -241,9 +244,13 @@ function ReportCard({
       status: report.status,
       resolvedNote: noteText,
       assignedOfficer: report.assignedOfficer || officerName,
+    }).then(() => {
+      setSuccessMsg("Inspection findings saved successfully.")
+      setTimeout(() => setSuccessMsg(null), 3500)
+    }).catch(() => {
+      setSuccessMsg("Save failed. Please try again.")
+      setTimeout(() => setSuccessMsg(null), 3500)
     })
-    setSuccessMsg("Inspection findings saved successfully.")
-    setTimeout(() => setSuccessMsg(null), 3500)
   }
 
   return (
@@ -775,9 +782,19 @@ export default function MyReports() {
     : (user?.username || "Ministry Official")
 
   useEffect(() => {
-    setReports(citizenReportService.getAll())
-    const handleReportsUpdate = () => {
-      setReports(citizenReportService.getAll())
+    // Show cached data immediately for instant render, then refresh from API
+    const cached = citizenReportService.getCached()
+    if (cached.length > 0) setReports(cached)
+
+    citizenReportService.getAll().then((data) => {
+      setReports(data)
+    }).catch((err) => {
+      console.warn("[MyReports] API fetch failed, using cache:", err)
+    })
+
+    const handleReportsUpdate = (e: Event) => {
+      const custom = e as CustomEvent
+      if (Array.isArray(custom.detail)) setReports(custom.detail)
     }
     window.addEventListener("drishti_reports_changed", handleReportsUpdate)
     return () => {

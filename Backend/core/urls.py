@@ -8,6 +8,7 @@ from .views import (
     UserViewSet, evidence_collection, reports_collection,
     system_health_view, admin_settings_view,
 )
+from .citizen_reports import citizen_reports_list, citizen_report_detail
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
@@ -25,5 +26,8 @@ urlpatterns = [
     path('reports/', reports_collection, name='reports_collection'),
     path('system/health/', system_health_view, name='system_health'),
     path('system/settings/', admin_settings_view, name='system_settings'),
+    # Citizen Grievance Reports (MongoDB-backed)
+    path('citizen-reports/', citizen_reports_list, name='citizen_reports_list'),
+    path('citizen-reports/<str:report_id>/', citizen_report_detail, name='citizen_report_detail'),
     path('', include(router.urls)),
 ]
