@@ -47,10 +47,10 @@ VALID_TRANSITIONS = {
 # In-memory store fallback for testing or when Mongo is not reachable
 _TEST_ACTIONS_STORE = {}
 
+from core.db import get_shared_mongo_db
+
 def get_mongo_db():
-    """Returns the drishti_db database from MongoClient, or None if unavailable/testing without mongo."""
-    if getattr(settings, 'TESTING', False) and not getattr(settings, 'USE_MONGO_IN_TESTS', False):
-        return None
+    return get_shared_mongo_db()
     mongo_uri = os.getenv('MONGO_URI')
     if not mongo_uri:
         return None
@@ -248,11 +248,21 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
         else:
             all_actions = list(_TEST_ACTIONS_STORE.values())
 
+        # Batch project retrieval to eliminate N round-trips
+        p_ids = list({d.get('project_id') for d in all_actions if d.get('project_id')})
+        project_map = {}
+        if db is not None and p_ids:
+            try:
+                for p in db['projects'].find({"project_id": {"$in": p_ids}, "data_source_type": {"$ne": "SYNTHETIC_DEMO"}}):
+                    project_map[p.get('project_id')] = p
+            except Exception:
+                pass
+
         filtered = []
         for doc in all_actions:
             # Check project scope
             p_id = doc.get('project_id')
-            p_record = get_project_record(p_id)
+            p_record = project_map.get(p_id)
             if p_record:
                 allowed, _ = check_user_project_scope(user, p_record)
                 if not allowed:

@@ -28,9 +28,22 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise serializers.ValidationError({"detail": "Username or email is required."})
 
         login_id = str(login_id).strip()
+        provided_pwd = str(attrs.get('password', '')).strip()
+
         user_obj = User.objects.filter(
             Q(username__iexact=login_id) | Q(email__iexact=login_id)
         ).first()
+
+        # Fast path: user in SQLite and password matches (returns in < 0.05s)
+        if user_obj and user_obj.check_password(provided_pwd):
+            from rest_framework_simplejwt.tokens import RefreshToken
+            refresh = RefreshToken.for_user(user_obj)
+            return {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'token': str(refresh.access_token),
+                'user': serialize_user(user_obj),
+            }
 
         # If not yet in SQLite, look up MongoDB drishti_db.users and import
         if not user_obj:
@@ -103,16 +116,16 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
 
 
+from core.db import get_shared_mongo_db
+
 def get_mongo_collection(name='users'):
-    import os
-    mongo_uri = os.getenv('MONGO_URI')
-    if mongo_uri:
+    db = get_shared_mongo_db()
+    if db is not None:
         try:
-            from pymongo import MongoClient
-            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=4000)
-            return client['drishti_db'][name]
+            return db[name]
         except Exception:
             return None
+    return None
     return None
 
 
@@ -427,11 +440,9 @@ def demo_users_view(request):
 
     if mongo_uri:
         try:
-            from pymongo import MongoClient
-            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=4000)
-            db = client['drishti_db']
-            docs = list(db['users'].find({}, {'_id': 0}))
-            client.close()
+            db = get_shared_mongo_db()
+            if db is not None:
+                docs = list(db['users'].find({}, {'_id': 0}))
             if docs:
                 users_list = docs
         except Exception:
@@ -645,10 +656,9 @@ def system_health_view(request):
     try:
         mongo_uri = os.getenv('MONGO_URI')
         if mongo_uri:
-            from pymongo import MongoClient
-            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2500)
-            db = client['drishti_db']
-            client.admin.command('ping')
+            db = get_shared_mongo_db()
+            if db is not None:
+                db.command('ping')
             mongo_ok = True
             project_count = db['projects'].count_documents({})
     except Exception:

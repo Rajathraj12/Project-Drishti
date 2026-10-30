@@ -7,10 +7,11 @@ import { Project, RiskAssessment } from '../types';
 // In-memory client-side cache for project listings
 let _projectsCache: {
   key: string;
+  token: string | null;
   data: { count: number; results: Project[] };
   timestamp: number;
 } | null = null;
-const CACHE_TTL_MS = 30000; // 30 seconds
+const CACHE_TTL_MS = 60000; // 60 seconds
 
 export const projectService = {
   /**
@@ -29,14 +30,16 @@ export const projectService = {
       if (queryString) query = `?${queryString}`;
     }
 
+    const token = localStorage.getItem('token') || localStorage.getItem('dev_role') || 'public';
     const now = Date.now();
-    if (!force && _projectsCache && _projectsCache.key === query && (now - _projectsCache.timestamp < CACHE_TTL_MS)) {
+    if (!force && _projectsCache && _projectsCache.key === query && _projectsCache.token === token && (now - _projectsCache.timestamp < CACHE_TTL_MS)) {
       return _projectsCache.data;
     }
 
     const data = await fetchApi<{count: number, results: Project[]}>(`/projects/${query}`);
     _projectsCache = {
       key: query,
+      token,
       data,
       timestamp: now,
     };
@@ -101,57 +104,65 @@ export const projectService = {
   },
 
   /**
-   * POST /api/projects/{id}/analyze
+   * POST /api/projects/{id}/analyze - Run Rule-based engine
    */
-  async triggerAnalysis(id: string): Promise<RiskAssessment> {
+  async analyzeProject(id: string): Promise<RiskAssessment> {
     projectService.clearCache();
     return fetchApi<RiskAssessment>(`/projects/${id}/analyze/`, { method: 'POST' });
   },
 
   /**
-   * POST /api/projects/bulk-analyze/
+   * POST /api/projects/bulk-analyze/ - Run Rule & ML engine for all projects
    */
-  async bulkAnalyzeProjects(): Promise<{total_projects: number, successful: number, unavailable: number, failures: number}> {
+  async bulkAnalyzeProjects(): Promise<{ total_projects: number; successful: number; failed: number }> {
     projectService.clearCache();
-    return fetchApi<any>(`/projects/bulk-analyze/`, { method: 'POST' });
+    return fetchApi<{ total_projects: number; successful: number; failed: number }>('/projects/bulk-analyze/', { method: 'POST' });
   },
 
-  async getProjectMlRisk(id: string): Promise<any> {
-    return fetchApi<any>(`/projects/${id}/ml-risk/`, { method: 'GET' });
-  },
-
-  async triggerMlAnalysis(id: string): Promise<any> {
+  /**
+   * POST /api/projects/{id}/ml-analyze - Run ML anomaly detection
+   */
+  async runMlAnalysis(id: string): Promise<any> {
     projectService.clearCache();
     return fetchApi<any>(`/projects/${id}/ml-analyze/`, { method: 'POST' });
   },
 
-  async submitVerification(id: string, data: any): Promise<any> {
-    projectService.clearCache();
-    return fetchApi<any>(`/projects/${id}/verify/`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  },
-
-  async getVerifications(id: string): Promise<any[]> {
-    return fetchApi<any[]>(`/projects/${id}/verifications/`, { method: 'GET' });
+  /**
+   * GET /api/projects/{id}/contractors
+   */
+  async getProjectContractors(id: string): Promise<any[]> {
+    return fetchApi<any[]>(`/projects/${id}/contractors/`);
   },
 
   /**
-   * Section 65B Inspection Checklist (persisted in MongoDB Atlas)
+   * GET /api/projects/{id}/evidence
    */
-  async getChecklists(): Promise<Record<string, Record<string, boolean>>> {
-    return fetchApi<Record<string, Record<string, boolean>>>(`/projects/checklists/`, { method: 'GET' });
+  async getProjectEvidence(id: string): Promise<any[]> {
+    return fetchApi<any[]>(`/projects/${id}/evidence/`);
   },
 
-  async getProjectChecklist(id: string): Promise<{ project_id: string; checked_items: Record<string, boolean> }> {
-    return fetchApi<{ project_id: string; checked_items: Record<string, boolean> }>(`/projects/${id}/checklist/`, { method: 'GET' });
+  /**
+   * GET /api/projects/{id}/timeline
+   */
+  async getProjectTimeline(id: string): Promise<any[]> {
+    return fetchApi<any[]>(`/projects/${id}/timeline/`);
   },
 
-  async saveChecklist(id: string, checkedItems: Record<string, boolean>): Promise<any> {
-    return fetchApi<any>(`/projects/${id}/checklist/`, {
+  /**
+   * GET /api/projects/{id}/checklist
+   */
+  async getProjectChecklist(id: string): Promise<Record<string, boolean>> {
+    return fetchApi<Record<string, boolean>>(`/projects/${id}/checklist/`);
+  },
+
+  /**
+   * POST /api/projects/{id}/checklist
+   */
+  async updateProjectChecklist(id: string, checked_items: Record<string, boolean>): Promise<{ status: string; project_id: string; checked_count: number }> {
+    projectService.clearCache();
+    return fetchApi<{ status: string; project_id: string; checked_count: number }>(`/projects/${id}/checklist/`, {
       method: 'POST',
-      body: JSON.stringify({ checked_items: checkedItems })
+      body: JSON.stringify({ checked_items }),
     });
-  }
+  },
 };

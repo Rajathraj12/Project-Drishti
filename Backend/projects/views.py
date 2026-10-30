@@ -2,28 +2,13 @@ import os
 import time
 from pymongo import MongoClient
 
-_SHARED_MONGO_CLIENT = None
+from core.db import get_shared_mongo_db
+
 _PROJECTS_CACHE = {}
 
-def get_shared_mongo_db():
-    global _SHARED_MONGO_CLIENT
-    mongo_uri = os.getenv('MONGO_URI')
-    if not mongo_uri:
-        return None
-    if _SHARED_MONGO_CLIENT is None:
-        try:
-            _SHARED_MONGO_CLIENT = MongoClient(
-                mongo_uri,
-                maxPoolSize=50,
-                minPoolSize=5,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000,
-                socketTimeoutMS=10000,
-            )
-        except Exception as e:
-            print(f"[MongoDB Pool Init Error]: {e}")
-            return None
-    return _SHARED_MONGO_CLIENT['drishti_db']
+def invalidate_projects_cache():
+    global _PROJECTS_CACHE
+    _PROJECTS_CACHE.clear()
 
 def invalidate_projects_cache():
     global _PROJECTS_CACHE
@@ -254,8 +239,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "project_name is required."}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             collection = db['projects']
             
             # Auto-generate next project_id if not provided
@@ -345,8 +329,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             
         data = request.data
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             collection = db['projects']
             
             existing = collection.find_one({"project_id": pk})
@@ -420,8 +403,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "MongoDB Atlas connection URI is not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             
             res = db['projects'].delete_one({"project_id": pk})
             if res.deleted_count == 0:
@@ -445,8 +427,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not mongo_uri:
             return None
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             doc = db['projects'].find_one({"project_id": project_id, "data_source_type": {"$ne": "SYNTHETIC_DEMO"}})
             client.close()
             return doc
@@ -473,13 +454,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
             risk_assessment = {}
             ml_assessment = {}
-            import os
-            from pymongo import MongoClient, DESCENDING
-            mongo_uri = os.getenv('MONGO_URI')
-            if mongo_uri:
+            from pymongo import DESCENDING
+            db = get_shared_mongo_db()
+            if db is not None:
                 try:
-                    client = MongoClient(mongo_uri)
-                    db = client['drishti_db']
                     r = db['risk_assessments'].find_one(
                         {"project_id": pk},
                         sort=[("assessment_timestamp", DESCENDING)]
@@ -494,7 +472,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     if m:
                         if '_id' in m: del m['_id']
                         ml_assessment = m
-                    client.close()
                 except Exception:
                     pass
 
@@ -567,11 +544,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # Save to MongoDB
         import os
         from pymongo import MongoClient
-        mongo_uri = os.getenv('MONGO_URI')
-        if mongo_uri:
+        db = get_shared_mongo_db()
+        if db is not None:
             try:
-                client = MongoClient(mongo_uri)
-                db = client['drishti_db']
                 db['risk_assessments'].update_one(
                     {"project_id": project_doc.get('project_id')},
                     {"$set": assessment.copy()},
@@ -597,8 +572,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "Database not configured"}, status=500)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             # Get latest assessment
             assessment = db['risk_assessments'].find_one(
                 {"project_id": pk},
@@ -625,8 +599,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "Database not configured"}, status=500)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             cursor = db['risk_assessments'].find(
                 {"project_id": pk},
                 sort=[("assessment_timestamp", DESCENDING)]
@@ -725,11 +698,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     
         import os
         from pymongo import MongoClient
-        mongo_uri = os.getenv('MONGO_URI')
-        if mongo_uri:
+        db = get_shared_mongo_db()
+        if db is not None:
             try:
-                client = MongoClient(mongo_uri)
-                db = client['drishti_db']
                 db['ml_assessments'].update_one(
                     {"project_id": pk},
                     {"$set": assessment.copy()},
@@ -754,8 +725,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "Database not configured"}, status=500)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             assessment = db['ml_assessments'].find_one(
                 {"project_id": pk},
                 sort=[("assessed_at", DESCENDING)]
@@ -785,8 +755,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "Database not configured"}, status=500)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             
             query = mongo_project_query(user)
                     
@@ -863,11 +832,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-        mongo_uri = os.getenv('MONGO_URI')
-        if mongo_uri:
+        db = get_shared_mongo_db()
+        if db is not None:
             try:
-                client = MongoClient(mongo_uri)
-                db = client['drishti_db']
                 
                 # Save audit log
                 db['verification_records'].insert_one(record.copy())
@@ -898,8 +865,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "Database not configured"}, status=500)
             
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             records = list(db['verification_records'].find({"project_id": pk}).sort("timestamp", DESCENDING))
             client.close()
             
@@ -946,8 +912,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not mongo_uri:
             return Response({"error": "MongoDB not configured"}, status=500)
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             docs = list(db['inspection_checklists'].find())
             client.close()
             results = {d.get("project_id"): d.get("checked_items", {}) for d in docs if d.get("project_id")}
@@ -967,8 +932,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"error": "MongoDB not configured"}, status=500)
 
         try:
-            client = MongoClient(mongo_uri)
-            db = client['drishti_db']
+            db = get_shared_mongo_db()
             col = db['inspection_checklists']
 
             if request.method == 'GET':

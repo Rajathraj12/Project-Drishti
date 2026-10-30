@@ -1,3 +1,4 @@
+import time
 import csv
 import io
 import os
@@ -16,8 +17,8 @@ from core.rbac import (
     user_can_access_project, assigned_project_ids
 )
 from projects.models import Project
-from projects.corrective_actions import (
-    get_mongo_db, compute_action_metadata,
+from core.db import get_shared_mongo_db as get_mongo_db
+from projects.corrective_actions import ( compute_action_metadata,
     _TEST_ACTIONS_STORE, ActionStatus, ActionPriority
 )
 
@@ -262,6 +263,8 @@ def get_scoped_reporting_dataset(user, query_params=None):
     }
 
 
+_REPORTS_DASHBOARD_CACHE = {}
+
 class OversightDashboardView(APIView):
     """
     GET /api/reports/dashboard/
@@ -271,6 +274,17 @@ class OversightDashboardView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        now = time.time()
+        role = get_role(request.user) if request.user and getattr(request.user, 'is_authenticated', False) else 'GUEST'
+        user_id = getattr(request.user, 'id', 'public') if request.user and getattr(request.user, 'is_authenticated', False) else 'public'
+        qp = str(sorted(request.query_params.items()))
+        cache_key = f"{role}:{user_id}:{qp}"
+
+        if cache_key in _REPORTS_DASHBOARD_CACHE:
+            cached_data, expiry = _REPORTS_DASHBOARD_CACHE[cache_key]
+            if now < expiry:
+                return Response(cached_data)
+
         dataset = get_scoped_reporting_dataset(request.user, request.query_params)
         projects = dataset['projects']
         actions = dataset['actions']
@@ -354,7 +368,7 @@ class OversightDashboardView(APIView):
 
         username = getattr(request.user, 'username', 'public_guest') if request.user and getattr(request.user, 'is_authenticated', False) else 'public_guest'
 
-        return Response({
+        resp_payload = {
             'user_scope': {
                 'username': username,
                 'role': role,
@@ -392,7 +406,9 @@ class OversightDashboardView(APIView):
                 'reporting_dates_available': ['2026-02-28', '2026-06-30', '2026-09-24'],
                 'server_as_of': datetime.now(timezone.utc).isoformat(),
             }
-        })
+        }
+        _REPORTS_DASHBOARD_CACHE[cache_key] = (resp_payload, now + 30)
+        return Response(resp_payload)
 
 
 class ReportsListView(APIView):

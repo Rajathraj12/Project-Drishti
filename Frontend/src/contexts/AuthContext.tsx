@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { authService } from '../services/authService';
+import { projectService } from '../services/projectService';
 import { isRole, landingPath, normalizeRole } from '../permissions/rbac';
 
 interface AuthContextType {
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (credentials: any) => {
     const res = await authService.login(credentials);
     localStorage.setItem('token', res.token);
+    projectService.clearCache();
     const role = normalizeRole(res.user.role);
     const normalized = { ...res.user, role: role || res.user.role };
     setUser(normalized);
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginCitizen = async (credentials: any) => {
     const res = await authService.citizenLogin(credentials);
     localStorage.setItem('token', res.token);
+    projectService.clearCache();
     const role = normalizeRole(res.user.role);
     const normalized = { ...res.user, role: role || res.user.role };
     setUser(normalized);
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerCitizen = async (data: any) => {
     const res = await authService.citizenRegister(data);
     localStorage.setItem('token', res.token);
+    projectService.clearCache();
     const role = normalizeRole(res.user.role);
     const normalized = { ...res.user, role: role || res.user.role };
     setUser(normalized);
@@ -122,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async (data: any) => {
     const res = await authService.googleLogin(data);
     localStorage.setItem('token', res.token);
+    projectService.clearCache();
     const role = normalizeRole(res.user.role);
     const normalized = { ...res.user, role: role || res.user.role };
     setUser(normalized);
@@ -132,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('dev_role');
+    projectService.clearCache();
     setDevRoleState(null);
     setUser(null);
     setDataEpoch((value) => value + 1);
@@ -142,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     persistDevRole(role);
     setDevRoleState(role);
     setLoading(true);
+    projectService.clearCache();
     try {
       await refreshUser();
       setDataEpoch((value) => value + 1);

@@ -224,3 +224,4 @@ def citizen_report_detail(request, report_id):
     except Exception as exc:
         print(f"[MongoDB] citizen_report_detail patch error: {exc}")
         return Response({'error': 'Database update failed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
