@@ -1038,39 +1038,44 @@ export default function Actions() {
         </div>
       )}
 
-      {/* =========================================================================
-          6. DETAIL DRAWER / INSPECTION WORKFLOW
+            {/* =========================================================================
+          6. CENTERED DETAIL & WORKFLOW MODAL
           ========================================================================= */}
       {selectedAction && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(11, 31, 75, 0.55)",
+            background: "rgba(11, 31, 75, 0.65)",
             backdropFilter: "blur(6px)",
             zIndex: 1000,
             display: "flex",
-            justifyContent: "flex-end"
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
           }}
           onClick={() => setSelectedAction(null)}
         >
           <div
             style={{
               width: "100%",
-              maxWidth: 780,
-              background: "white",
-              height: "100%",
+              maxWidth: 820,
+              maxHeight: "88vh",
+              background: "#ffffff",
+              borderRadius: 16,
+              boxShadow: "0 25px 50px -12px rgba(11, 31, 75, 0.35)",
+              border: "1px solid #e2e8f0",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "-8px 0 32px rgba(15, 42, 107, 0.2)"
+              overflow: "hidden"
             }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Drawer Header */}
+            {/* Modal Header */}
             <div
               style={{
-                padding: "20px 28px",
-                borderBottom: "1px solid var(--color-border)",
+                padding: "18px 24px",
+                borderBottom: "1px solid #e2e8f0",
                 display: "flex",
                 alignItems: "flex-start",
                 justifyContent: "space-between",
@@ -1078,12 +1083,32 @@ export default function Actions() {
               }}
             >
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, fontSize: "1.15rem", color: "var(--color-navy-900)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 800, fontSize: "1.1rem", color: "#0f2a6b" }}>
                     {selectedAction.action_id}
                   </span>
-                  <span style={{ fontSize: "0.72rem", background: "var(--color-navy-100)", color: "var(--color-navy-800)", padding: "2px 9px", borderRadius: 8, fontWeight: 700 }}>
+                  <span style={{ fontSize: "0.72rem", background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>
                     Project {selectedAction.project_id}
+                  </span>
+                  <span style={{
+                    fontSize: "0.7rem",
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontWeight: 700,
+                    background: STATUS_MAP[selectedAction.status]?.bg || "#f1f5f9",
+                    color: STATUS_MAP[selectedAction.status]?.color || "#475569"
+                  }}>
+                    {selectedAction.status.replace(/_/g, " ")}
+                  </span>
+                  <span style={{
+                    fontSize: "0.7rem",
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontWeight: 700,
+                    background: selectedAction.priority === "CRITICAL" ? "#fee2e2" : selectedAction.priority === "HIGH" ? "#ffedd5" : "#f1f5f9",
+                    color: selectedAction.priority === "CRITICAL" ? "#dc2626" : selectedAction.priority === "HIGH" ? "#ea580c" : "#475569"
+                  }}>
+                    {selectedAction.priority}
                   </span>
                   {selectedAction.is_overdue && (
                     <span style={{ fontSize: "0.7rem", background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>
@@ -1091,7 +1116,7 @@ export default function Actions() {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-navy-900)" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#0f172a" }}>
                   {selectedAction.title}
                 </div>
               </div>
@@ -1099,8 +1124,8 @@ export default function Actions() {
               <button
                 onClick={() => setSelectedAction(null)}
                 style={{
-                  background: "white",
-                  border: "1px solid var(--color-border)",
+                  background: "#ffffff",
+                  border: "1px solid #cbd5e1",
                   borderRadius: "50%",
                   width: 32,
                   height: 32,
@@ -1108,16 +1133,18 @@ export default function Actions() {
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  color: "var(--color-text-muted)",
-                  fontSize: "1rem"
+                  color: "#64748b",
+                  fontSize: "1rem",
+                  fontWeight: 700,
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
                 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Navigation Tabs inside Drawer */}
-            <div style={{ display: "flex", borderBottom: "1px solid var(--color-border)", padding: "0 28px", background: "white" }}>
+            {/* Modal Navigation Tabs */}
+            <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0", padding: "0 24px", background: "#ffffff" }}>
               {[
                 { id: "overview", label: "Overview & Directive" },
                 { id: "progress", label: `Field Updates (${selectedAction.progress_updates?.length || 0})` },
@@ -1130,8 +1157,8 @@ export default function Actions() {
                   style={{
                     padding: "12px 18px",
                     border: "none",
-                    borderBottom: activeTab === t.id ? "3px solid var(--color-orange-500)" : "3px solid transparent",
-                    color: activeTab === t.id ? "var(--color-navy-900)" : "var(--color-text-muted)",
+                    borderBottom: activeTab === t.id ? "3px solid #f97316" : "3px solid transparent",
+                    color: activeTab === t.id ? "#0f2a6b" : "#64748b",
                     fontWeight: activeTab === t.id ? 700 : 500,
                     fontSize: "0.82rem",
                     cursor: "pointer",
@@ -1143,84 +1170,84 @@ export default function Actions() {
               ))}
             </div>
 
-            {/* Tab Contents */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+            {/* Tab Contents (Scrollable) */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
               {/* TAB 1: OVERVIEW & LINEAGE */}
               {activeTab === "overview" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "var(--color-navy-50)", padding: 16, borderRadius: 10, border: "1px solid var(--color-border)" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, background: "#f8fafc", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
                     <div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Workflow Status</div>
-                      <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--color-navy-900)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Workflow Status</div>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#0f2a6b", marginTop: 2 }}>
                         {selectedAction.status.replace(/_/g, " ")}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Urgency Priority</div>
-                      <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--color-orange-600)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Urgency Priority</div>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 800, color: selectedAction.priority === "CRITICAL" ? "#dc2626" : "#ea580c", marginTop: 2 }}>
                         {selectedAction.priority}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Assigned Authority</div>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--color-text-primary)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Assigned Authority</div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1e293b", marginTop: 2 }}>
                         {selectedAction.assigned_to || "Unassigned"} ({selectedAction.assigned_agency || "Implementing Agency"})
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--color-text-muted)", fontWeight: 700, textTransform: "uppercase" }}>Target Due Date</div>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--color-text-primary)", marginTop: 2 }}>
+                      <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Target Due Date</div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#1e293b", marginTop: 2 }}>
                         {selectedAction.due_date ? new Date(selectedAction.due_date).toLocaleDateString() : "—"}
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--color-navy-900)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                    <div style={{ fontSize: "0.74rem", fontWeight: 800, color: "#0f2a6b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
                       Corrective Directive Description
                     </div>
-                    <div style={{ fontSize: "0.84rem", background: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text-primary)", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: "0.84rem", background: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid #e2e8f0", color: "#334155", lineHeight: 1.5 }}>
                       {selectedAction.description}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--color-navy-900)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                    <div style={{ fontSize: "0.74rem", fontWeight: 800, color: "#0f2a6b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
                       Trigger Finding / Statutory Justification
                     </div>
-                    <div style={{ fontSize: "0.84rem", background: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid var(--color-border)", color: "var(--color-text-primary)", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: "0.84rem", background: "#f8fafc", padding: 14, borderRadius: 8, border: "1px solid #e2e8f0", color: "#334155", lineHeight: 1.5 }}>
                       {selectedAction.reason}
                     </div>
                   </div>
 
                   {/* Connected Finding Lineage Trace */}
-                  <div style={{ marginTop: 6, borderTop: "1px solid var(--color-border)", paddingTop: 16 }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 10 }}>
+                  <div style={{ marginTop: 4, borderTop: "1px solid #e2e8f0", paddingTop: 14 }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 8 }}>
                       Connected Finding Lineage & Traceability
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid var(--color-border-light)" }}>
-                        <span style={{ fontWeight: 700, minWidth: 150, color: "var(--color-navy-800)" }}>Rule-Based Finding:</span>
-                        <span style={{ fontFamily: "var(--font-mono)" }}>{selectedAction.risk_assessment_id || "None linked"}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid #f1f5f9" }}>
+                        <span style={{ fontWeight: 700, minWidth: 150, color: "#1e3a8a" }}>Rule-Based Finding:</span>
+                        <span style={{ fontFamily: "var(--font-mono, monospace)", color: "#475569" }}>{selectedAction.risk_assessment_id || "None linked"}</span>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid var(--color-border-light)" }}>
-                        <span style={{ fontWeight: 700, minWidth: 150, color: "var(--color-navy-800)" }}>ML Anomaly Detection:</span>
-                        <span style={{ fontFamily: "var(--font-mono)" }}>{selectedAction.ml_assessment_id || "None linked"}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid #f1f5f9" }}>
+                        <span style={{ fontWeight: 700, minWidth: 150, color: "#1e3a8a" }}>ML Anomaly Detection:</span>
+                        <span style={{ fontFamily: "var(--font-mono, monospace)", color: "#475569" }}>{selectedAction.ml_assessment_id || "None linked"}</span>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid var(--color-border-light)" }}>
-                        <span style={{ fontWeight: 700, minWidth: 150, color: "var(--color-navy-800)" }}>Verification Protocol:</span>
-                        <span style={{ fontFamily: "var(--font-mono)" }}>{selectedAction.verification_id || "None linked"}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid #f1f5f9" }}>
+                        <span style={{ fontWeight: 700, minWidth: 150, color: "#1e3a8a" }}>Verification Protocol:</span>
+                        <span style={{ fontFamily: "var(--font-mono, monospace)", color: "#475569" }}>{selectedAction.verification_id || "None linked"}</span>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid var(--color-border-light)" }}>
-                        <span style={{ fontWeight: 700, minWidth: 150, color: "var(--color-navy-800)" }}>Attached Evidence Records:</span>
-                        <span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.8rem", border: "1px solid #f1f5f9" }}>
+                        <span style={{ fontWeight: 700, minWidth: 150, color: "#1e3a8a" }}>Attached Evidence:</span>
+                        <span style={{ color: "#475569" }}>
                           {selectedAction.evidence_ids && selectedAction.evidence_ids.length > 0
                             ? selectedAction.evidence_ids.join(", ")
                             : "No evidence artifacts attached"}
@@ -1230,15 +1257,15 @@ export default function Actions() {
                   </div>
 
                   {selectedAction.resolution_summary && (
-                    <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: 16, borderRadius: 10 }}>
-                      <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#065f46", marginBottom: 4 }}>
+                    <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: 14, borderRadius: 10 }}>
+                      <div style={{ fontSize: "0.76rem", fontWeight: 800, color: "#065f46", marginBottom: 4 }}>
                         Submitted Resolution Summary (Author: {selectedAction.resolution_submitted_by})
                       </div>
-                      <div style={{ fontSize: "0.84rem", color: "#047857", lineHeight: 1.45 }}>
+                      <div style={{ fontSize: "0.82rem", color: "#047857", lineHeight: 1.45 }}>
                         {selectedAction.resolution_summary}
                       </div>
                       {selectedAction.closure_reviewer && (
-                        <div style={{ fontSize: "0.75rem", color: "#065f46", marginTop: 8, borderTop: "1px solid #a7f3d0", paddingTop: 6 }}>
+                        <div style={{ fontSize: "0.74rem", color: "#065f46", marginTop: 8, borderTop: "1px solid #a7f3d0", paddingTop: 6 }}>
                           Reviewed & Verified by: <strong>{selectedAction.closure_reviewer}</strong> ({selectedAction.closure_reviewed_at})
                         </div>
                       )}
@@ -1249,43 +1276,43 @@ export default function Actions() {
 
               {/* TAB 2: PROGRESS UPDATES */}
               {activeTab === "progress" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                   {selectedAction.status !== "CLOSED" && selectedAction.status !== "CANCELLED" && (
-                    <form onSubmit={handleProgressSubmit} style={{ background: "#f8fafc", padding: 18, borderRadius: 10, border: "1px solid var(--color-border)" }}>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 8 }}>
+                    <form onSubmit={handleProgressSubmit} style={{ background: "#f8fafc", padding: 16, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 8 }}>
                         Record Execution Milestone Progress
                       </div>
 
                       <textarea
                         required
-                        placeholder="Detail the technical rectifications executed, on-site measures, or material changes implemented..."
+                        placeholder="Detail technical rectifications executed, on-site measures, or material changes implemented..."
                         value={progMessage}
                         onChange={e => setProgMessage(e.target.value)}
                         rows={3}
-                        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem", marginBottom: 10 }}
+                        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", marginBottom: 10, boxSizing: "border-box" }}
                       />
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                         <div>
-                          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-text-muted)" }}>Progress Completed (%):</label>
+                          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Progress Completed (%):</label>
                           <input
                             type="number"
                             min={0}
                             max={100}
                             value={progPct}
                             onChange={e => setProgPct(Number(e.target.value))}
-                            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem" }}
+                            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", boxSizing: "border-box" }}
                           />
                         </div>
 
                         <div>
-                          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-text-muted)" }}>Evidence Artifact IDs:</label>
+                          <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", display: "block", marginBottom: 4 }}>Evidence Artifact IDs:</label>
                           <input
                             type="text"
                             placeholder="e.g. EV-1002, EV-1005"
                             value={progEvidence}
                             onChange={e => setProgEvidence(e.target.value)}
-                            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem" }}
+                            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", boxSizing: "border-box" }}
                           />
                         </div>
                       </div>
@@ -1294,7 +1321,7 @@ export default function Actions() {
                         type="submit"
                         disabled={progLoading}
                         style={{
-                          background: "var(--color-navy-800)",
+                          background: "#0f2a6b",
                           color: "white",
                           border: "none",
                           padding: "8px 16px",
@@ -1310,37 +1337,37 @@ export default function Actions() {
                   )}
 
                   <div>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 14 }}>
+                    <div style={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 12 }}>
                       Chronological Milestone Timeline
                     </div>
 
                     {(!selectedAction.progress_updates || selectedAction.progress_updates.length === 0) ? (
-                      <div style={{ color: "var(--color-text-muted)", fontSize: "0.82rem", textAlign: "center", padding: "30px 20px", background: "#f8fafc", borderRadius: 10 }}>
+                      <div style={{ color: "#64748b", fontSize: "0.82rem", textAlign: "center", padding: "28px 20px", background: "#f8fafc", borderRadius: 10, border: "1px dashed #cbd5e1" }}>
                         No execution updates submitted for this directive yet.
                       </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         {selectedAction.progress_updates.map(upd => (
-                          <div key={upd.update_id} style={{ borderLeft: "3px solid var(--color-orange-500)", paddingLeft: 14, paddingBottom: 6 }}>
+                          <div key={upd.update_id} style={{ borderLeft: "3px solid #f97316", paddingLeft: 14, paddingBottom: 6 }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--color-navy-900)" }}>
+                              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "#0f2a6b" }}>
                                 {upd.actor_name} ({upd.actor_role})
                               </span>
-                              <span style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }}>
+                              <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
                                 {new Date(upd.timestamp).toLocaleString()}
                               </span>
                             </div>
 
-                            <div style={{ fontSize: "0.82rem", color: "var(--color-text-primary)", lineHeight: 1.4 }}>
+                            <div style={{ fontSize: "0.82rem", color: "#334155", lineHeight: 1.4 }}>
                               {upd.message}
                             </div>
 
                             {upd.progress_pct !== undefined && upd.progress_pct !== null && (
                               <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 10 }}>
                                 <div style={{ flex: 1, background: "#e2e8f0", height: 6, borderRadius: 3, overflow: "hidden" }}>
-                                  <div style={{ width: `${upd.progress_pct}%`, background: "var(--color-orange-500)", height: "100%" }} />
+                                  <div style={{ width: `${upd.progress_pct}%`, background: "#f97316", height: "100%" }} />
                                 </div>
-                                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-text-muted)" }}>
+                                <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>
                                   {upd.progress_pct}%
                                 </span>
                               </div>
@@ -1365,23 +1392,22 @@ export default function Actions() {
 
               {/* TAB 3: RESOLUTION & GOVERNANCE */}
               {activeTab === "review" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                   {isAssigneeOrSubmitter && (
-                    <div style={{ background: "#fff5f5", border: "1px solid #fecaca", padding: 14, borderRadius: 8, color: "#b91c1c", fontSize: "0.8rem" }}>
-                      <strong>Separation of Duties Policy Enforcement:</strong>
+                    <div style={{ background: "#fff5f5", border: "1px solid #fecaca", padding: 12, borderRadius: 8, color: "#b91c1c", fontSize: "0.8rem" }}>
+                      <strong>Separation of Duties Policy:</strong>
                       <p style={{ marginTop: 4, marginBottom: 0, lineHeight: 1.4 }}>
-                        You are recorded as the assignee or resolution submitter for this corrective action.
-                        Under Project Drishti governance policy, an independent supervising officer must review and close this action.
+                        You are recorded as the assignee or resolution submitter. An independent supervising officer must review and close this action.
                       </p>
                     </div>
                   )}
 
                   {selectedAction.status !== "CLOSED" && selectedAction.status !== "CANCELLED" && (
-                    <div style={{ background: "#f8fafc", padding: 18, borderRadius: 10, border: "1px solid var(--color-border)" }}>
-                      <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 4 }}>
+                    <div style={{ background: "#f8fafc", padding: 16, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 4 }}>
                         1. Submit Resolution for Formal Sign-Off
                       </div>
-                      <p style={{ fontSize: "0.78rem", color: "var(--color-text-muted)", marginBottom: 12 }}>
+                      <p style={{ fontSize: "0.76rem", color: "#64748b", marginBottom: 10 }}>
                         Summarize corrective measures implemented and declare readiness for supervisory sign-off.
                       </p>
 
@@ -1392,7 +1418,7 @@ export default function Actions() {
                           value={resSummary}
                           onChange={e => setResSummary(e.target.value)}
                           rows={3}
-                          style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem", marginBottom: 10 }}
+                          style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", marginBottom: 10, boxSizing: "border-box" }}
                         />
 
                         <input
@@ -1400,7 +1426,7 @@ export default function Actions() {
                           placeholder="Evidence references (e.g. EV-1004, EV-1008)"
                           value={resEvidence}
                           onChange={e => setResEvidence(e.target.value)}
-                          style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem", marginBottom: 12 }}
+                          style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.82rem", marginBottom: 12, boxSizing: "border-box" }}
                         />
 
                         <button
@@ -1425,11 +1451,11 @@ export default function Actions() {
                   )}
 
                   {selectedAction.status === "AWAITING_REVIEW" && (
-                    <div style={{ background: "#f0fdf4", padding: 18, borderRadius: 10, border: "1px solid #bbf7d0" }}>
-                      <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#14532d", marginBottom: 4 }}>
+                    <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 10, border: "1px solid #bbf7d0" }}>
+                      <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#14532d", marginBottom: 4 }}>
                         2. Supervisory Verification & Closure Approval
                       </div>
-                      <p style={{ fontSize: "0.78rem", color: "#166534", marginBottom: 12 }}>
+                      <p style={{ fontSize: "0.76rem", color: "#166534", marginBottom: 10 }}>
                         Validate the contractor's corrective measures and approve formal closure or return for re-inspection.
                       </p>
 
@@ -1438,7 +1464,7 @@ export default function Actions() {
                         value={reviewNotes}
                         onChange={e => setReviewNotes(e.target.value)}
                         rows={2}
-                        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #bbf7d0", fontSize: "0.8rem", marginBottom: 12 }}
+                        style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #bbf7d0", fontSize: "0.82rem", marginBottom: 10, boxSizing: "border-box" }}
                       />
 
                       <div style={{ display: "flex", gap: 10 }}>
@@ -1482,21 +1508,21 @@ export default function Actions() {
                   )}
 
                   {/* Administrative Override */}
-                  <div style={{ background: "#f8fafc", padding: 18, borderRadius: 10, border: "1px solid var(--color-border)" }}>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 10 }}>
+                  <div style={{ background: "#f8fafc", padding: 16, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 8 }}>
                       Administrative Lifecycle Override
                     </div>
 
                     {selectedAction.status === "CLOSED" && (
                       <div>
-                        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: 4 }}>Reopen Closed Directive:</div>
+                        <div style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b", marginBottom: 4 }}>Reopen Closed Directive:</div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <input
                             type="text"
                             placeholder="State rationale for reopening audit case..."
                             value={reopenReason}
                             onChange={e => setReopenReason(e.target.value)}
-                            style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem" }}
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           />
                           <button
                             type="button"
@@ -1511,14 +1537,14 @@ export default function Actions() {
 
                     {selectedAction.status !== "CLOSED" && selectedAction.status !== "CANCELLED" && (
                       <div>
-                        <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--color-text-muted)", marginBottom: 4 }}>Void / Cancel Directive:</div>
+                        <div style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b", marginBottom: 4 }}>Void / Cancel Directive:</div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <input
                             type="text"
                             placeholder="State justification for cancellation..."
                             value={cancelReason}
                             onChange={e => setCancelReason(e.target.value)}
-                            style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem" }}
+                            style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           />
                           <button
                             type="button"
@@ -1537,30 +1563,35 @@ export default function Actions() {
               {/* TAB 4: AUDIT TRAIL */}
               {activeTab === "audit" && (
                 <div>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "var(--color-navy-900)", marginBottom: 14 }}>
+                  <div style={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f2a6b", marginBottom: 12 }}>
                     Append-Only Immutable Audit Trail
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {(selectedAction.audit_history || []).map((evt, idx) => (
-                      <div key={evt.event_id || idx} style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: 8, border: "1px solid var(--color-border)" }}>
+                      <div key={evt.event_id || idx} style={{ background: "#f8fafc", padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--color-navy-900)", fontFamily: "var(--font-mono)" }}>
+                          <span style={{ fontSize: "0.76rem", fontWeight: 800, color: "#0f2a6b", fontFamily: "var(--font-mono, monospace)" }}>
                             {evt.event_type}
                           </span>
-                          <span style={{ fontSize: "0.7rem", color: "var(--color-text-muted)" }}>
+                          <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
                             {new Date(evt.timestamp).toLocaleString()}
                           </span>
                         </div>
 
-                        <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: 6 }}>
-                          Authorized Actor: <strong style={{ color: "var(--color-navy-900)" }}>{evt.actor_username}</strong> ({evt.actor_role})
+                        <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: 6 }}>
+                          Authorized Actor: <strong style={{ color: "#0f172a" }}>{evt.actor_username}</strong> ({evt.actor_role})
                         </div>
 
                         {evt.details && Object.keys(evt.details).length > 0 && (
-                          <pre style={{ margin: 0, padding: 8, background: "#f1f5f9", borderRadius: 6, fontSize: "0.7rem", overflowX: "auto", color: "var(--color-navy-800)" }}>
-                            {JSON.stringify(evt.details, null, 2)}
-                          </pre>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 6, background: "#ffffff", padding: 8, borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                            {Object.entries(evt.details).map(([k, v]) => (
+                              <div key={k} style={{ fontSize: "0.72rem" }}>
+                                <span style={{ color: "#64748b", fontWeight: 600 }}>{k}: </span>
+                                <span style={{ color: "#0f2a6b", fontWeight: 700 }}>{String(v)}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -1571,6 +1602,7 @@ export default function Actions() {
           </div>
         </div>
       )}
+
 
       {/* =========================================================================
           7. INITIATE CORRECTIVE ACTION MODAL
