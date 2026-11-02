@@ -259,7 +259,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             else:
                 project_id = str(project_id).strip().upper()
                 if collection.find_one({"project_id": project_id}):
-                    client.close()
                     return Response({"error": f"Project with ID '{project_id}' already exists in MongoDB."}, status=status.HTTP_400_BAD_REQUEST)
             
             orig_cr = float(data.get('original_cost_cr') or data.get('original_cost') or 100.0)
@@ -300,8 +299,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 {"$setOnInsert": {"project_id": project_id, "checked_items": {}, "updated_at": datetime.now(timezone.utc).isoformat()}},
                 upsert=True
             )
-            client.close()
-            
             # Format payload for frontend
             doc.pop('_id', None)
             doc['reported_progress'] = progress_pct
@@ -334,7 +331,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             
             existing = collection.find_one({"project_id": pk})
             if not existing:
-                client.close()
                 return Response({"error": f"Project '{pk}' not found in MongoDB."}, status=status.HTTP_404_NOT_FOUND)
             
             update_fields = {}
@@ -379,8 +375,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             
             collection.update_one({"project_id": pk}, {"$set": update_fields})
             updated_doc = collection.find_one({"project_id": pk}, {'_id': 0})
-            client.close()
-            
             if updated_doc:
                 updated_doc['reported_progress'] = updated_doc.get('reported_progress_pct')
                 updated_doc['original_cost'] = updated_doc.get('original_cost_cr')
@@ -407,15 +401,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
             
             res = db['projects'].delete_one({"project_id": pk})
             if res.deleted_count == 0:
-                client.close()
                 return Response({"error": f"Project '{pk}' not found in MongoDB."}, status=status.HTTP_404_NOT_FOUND)
                 
             # Clean up associated checklists
             db['inspection_checklists'].delete_many({"project_id": pk})
             db['risk_assessments'].delete_many({"project_id": pk})
             db['ml_assessments'].delete_many({"project_id": pk})
-            client.close()
-            
             return Response({"message": f"Project '{pk}' successfully deleted from MongoDB Atlas.", "project_id": pk}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Failed to delete project from MongoDB: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -429,7 +420,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         try:
             db = get_shared_mongo_db()
             doc = db['projects'].find_one({"project_id": project_id, "data_source_type": {"$ne": "SYNTHETIC_DEMO"}})
-            client.close()
             return doc
         except Exception:
             return None
@@ -552,7 +542,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     {"$set": assessment.copy()},
                     upsert=True
                 )
-                client.close()
             except Exception as e:
                 print("Failed to save assessment:", e)
                 
@@ -578,8 +567,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 {"project_id": pk},
                 sort=[("assessment_timestamp", DESCENDING)]
             )
-            client.close()
-            
             if not assessment:
                 return Response({"error": "No assessment found"}, status=status.HTTP_404_NOT_FOUND)
                 
@@ -605,8 +592,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 sort=[("assessment_timestamp", DESCENDING)]
             )
             assessments = list(cursor)
-            client.close()
-            
             for a in assessments:
                 if "_id" in a:
                     del a["_id"]
@@ -706,7 +691,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     {"$set": assessment.copy()},
                     upsert=True
                 )
-                client.close()
             except Exception as e:
                 print("Failed to save ML assessment:", e)
                 
@@ -730,8 +714,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 {"project_id": pk},
                 sort=[("assessed_at", DESCENDING)]
             )
-            client.close()
-            
             if not assessment:
                 return Response({"error": "No ML assessment found"}, status=status.HTTP_404_NOT_FOUND)
                 
@@ -780,8 +762,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     )
                 except Exception as e:
                     failures += 1
-                    
-            client.close()
             return Response({
                 "total_projects": total,
                 "successful": successful,
@@ -845,7 +825,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         {"project_id": pk},
                         {"$set": {"verification_status": new_status}}
                     )
-                client.close()
             except Exception as e:
                 return Response({"error": f"Database error: {str(e)}"}, status=500)
 
@@ -867,8 +846,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         try:
             db = get_shared_mongo_db()
             records = list(db['verification_records'].find({"project_id": pk}).sort("timestamp", DESCENDING))
-            client.close()
-            
             for r in records:
                 if "_id" in r:
                     del r["_id"]
@@ -914,7 +891,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         try:
             db = get_shared_mongo_db()
             docs = list(db['inspection_checklists'].find())
-            client.close()
             results = {d.get("project_id"): d.get("checked_items", {}) for d in docs if d.get("project_id")}
             return Response(results)
         except Exception as e:
@@ -937,7 +913,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
             if request.method == 'GET':
                 doc = col.find_one({"project_id": pk})
-                client.close()
                 if doc and "_id" in doc:
                     del doc["_id"]
                 return Response(doc or {"project_id": pk, "checked_items": {}})
@@ -957,7 +932,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             }
 
             col.update_one({"project_id": pk}, {"$set": doc}, upsert=True)
-            client.close()
             return Response({"status": "saved", "project_id": pk, "checked_items": checked_items, "verified_count": verified_count})
         except Exception as e:
             return Response({"error": str(e)}, status=500)

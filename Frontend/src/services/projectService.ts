@@ -97,6 +97,13 @@ export const projectService = {
   },
 
   /**
+   * GET /api/projects/{id}/ml-risk
+   */
+  async getProjectMlRisk(id: string): Promise<any> {
+    return fetchApi<any>(`/projects/${id}/ml-risk/`, { method: 'GET' });
+  },
+
+  /**
    * GET /api/projects/{id}/why-flagged
    */
   async getWhyFlagged(id: string): Promise<any> {
@@ -109,6 +116,10 @@ export const projectService = {
   async analyzeProject(id: string): Promise<RiskAssessment> {
     projectService.clearCache();
     return fetchApi<RiskAssessment>(`/projects/${id}/analyze/`, { method: 'POST' });
+  },
+
+  async triggerAnalysis(id: string): Promise<RiskAssessment> {
+    return this.analyzeProject(id);
   },
 
   /**
@@ -125,6 +136,28 @@ export const projectService = {
   async runMlAnalysis(id: string): Promise<any> {
     projectService.clearCache();
     return fetchApi<any>(`/projects/${id}/ml-analyze/`, { method: 'POST' });
+  },
+
+  async triggerMlAnalysis(id: string): Promise<any> {
+    return this.runMlAnalysis(id);
+  },
+
+  /**
+   * GET /api/projects/{id}/verifications
+   */
+  async getVerifications(id: string): Promise<any[]> {
+    return fetchApi<any[]>(`/projects/${id}/verifications/`);
+  },
+
+  /**
+   * POST /api/projects/{id}/verify
+   */
+  async submitVerification(id: string, data: any): Promise<any> {
+    projectService.clearCache();
+    return fetchApi<any>(`/projects/${id}/verify/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   /**

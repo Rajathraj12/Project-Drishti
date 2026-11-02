@@ -14,7 +14,7 @@ def train_and_save():
     print("Loading data...")
     df = load_and_clean_data(csv_path)
     
-    # 4. IMPORTANT: OFFICIAL DATA AS PRIMARY TRAINING POPULATION
+    
     print("Filtering OFFICIAL records for training...")
     train_df = df[df["data_source_type"] == "OFFICIAL"].copy()
     
