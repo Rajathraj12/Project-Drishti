@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { correctiveActionService } from "../services/correctiveActionService"
+import { correctiveActionService, AssigneeAuthority } from "../services/correctiveActionService"
 import { CorrectiveAction, ActionPriorityLevel } from "../types"
 import { useAuth } from "../contexts/AuthContext"
 
@@ -163,6 +163,8 @@ export default function Actions() {
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   )
   const [createAssignee, setCreateAssignee] = useState("")
+  const [assignees, setAssignees] = useState<AssigneeAuthority[]>([])
+  const [isCustomAssignee, setIsCustomAssignee] = useState(false)
   const [createAgency, setCreateAgency] = useState("")
   const [createRiskId, setCreateRiskId] = useState("")
   const [createMlId, setCreateMlId] = useState("")
@@ -216,6 +218,10 @@ export default function Actions() {
   useEffect(() => {
     fetchActions()
   }, [statusFilter, priorityFilter, overdueOnly])
+
+  useEffect(() => {
+    correctiveActionService.getAssignees().then(setAssignees).catch(() => setAssignees([]))
+  }, [])
 
   // Filtered by Search
   const filteredActions = actions.filter(a => {
@@ -1745,14 +1751,104 @@ export default function Actions() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--color-navy-900)" }}>Assigned Authority (Username)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. dev_field_officer"
-                    value={createAssignee}
-                    onChange={e => setCreateAssignee(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: "0.8rem", marginTop: 4 }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--color-navy-900)" }}>
+                      Assigned Authority
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomAssignee(!isCustomAssignee)
+                        setCreateAssignee("")
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "0.68rem",
+                        color: "#2563eb",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: 0
+                      }}
+                    >
+                      {isCustomAssignee ? "← Choose from available" : "+ Enter custom"}
+                    </button>
+                  </div>
+
+                  {isCustomAssignee ? (
+                    <input
+                      type="text"
+                      placeholder="e.g. dev_field_officer"
+                      value={createAssignee}
+                      onChange={e => setCreateAssignee(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border)",
+                        fontSize: "0.8rem",
+                        marginTop: 4,
+                        boxSizing: "border-box"
+                      }}
+                    />
+                  ) : (
+                    <select
+                      value={createAssignee}
+                      onChange={e => {
+                        const val = e.target.value
+                        setCreateAssignee(val)
+                        const found = assignees.find(a => a.username === val)
+                        if (found) {
+                          setCreateAgency(found.department || found.state || "")
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border)",
+                        fontSize: "0.8rem",
+                        marginTop: 4,
+                        background: "white",
+                        boxSizing: "border-box"
+                      }}
+                    >
+                      <option value="">-- Select Available Authority --</option>
+                      {assignees.filter(a => a.role === "FIELD_OFFICER").length > 0 && (
+                        <optgroup label="🛠️ Field Officers / Site Inspectors">
+                          {assignees
+                            .filter(a => a.role === "FIELD_OFFICER")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || a.district || a.state || "Field Inspection"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {assignees.filter(a => a.role === "GOVERNMENT_OFFICER").length > 0 && (
+                        <optgroup label="🏛️ Government / Department Officers">
+                          {assignees
+                            .filter(a => a.role === "GOVERNMENT_OFFICER")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || a.state || "State Oversight"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {assignees.filter(a => a.role === "ADMIN").length > 0 && (
+                        <optgroup label="🛡️ PMO Administrators">
+                          {assignees
+                            .filter(a => a.role === "ADMIN")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || "National Oversight"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  )}
                 </div>
               </div>
 

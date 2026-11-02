@@ -2,7 +2,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts"
 import { projectService } from "../services/projectService"
-import { correctiveActionService } from "../services/correctiveActionService"
+import { correctiveActionService, AssigneeAuthority } from "../services/correctiveActionService"
 import { Project, CorrectiveAction } from "../types"
 import { useAuth } from "../contexts/AuthContext"
 import { canAccessPath, hasCapability } from "../permissions/rbac"
@@ -117,6 +117,8 @@ export default function ProjectDetails() {
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   )
   const [actionAssignee, setActionAssignee] = useState("")
+  const [assignees, setAssignees] = useState<AssigneeAuthority[]>([])
+  const [isCustomAssignee, setIsCustomAssignee] = useState(false)
   const [actionAgency, setActionAgency] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
   const [showCalculationModal, setShowCalculationModal] = useState(false)
@@ -1272,14 +1274,76 @@ export default function ProjectDetails() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Assign To User</label>
-                  <input
-                    type="text"
-                    placeholder="Officer username"
-                    value={actionAssignee}
-                    onChange={e => setActionAssignee(e.target.value)}
-                    className="w-full border border-slate-200 rounded p-2 text-xs"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700 text-xs">Assign To Authority</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomAssignee(!isCustomAssignee);
+                        setActionAssignee("");
+                      }}
+                      className="text-[11px] text-blue-600 underline"
+                    >
+                      {isCustomAssignee ? "Select list" : "Custom"}
+                    </button>
+                  </div>
+                  {isCustomAssignee ? (
+                    <input
+                      type="text"
+                      placeholder="e.g. dev_field_officer"
+                      value={actionAssignee}
+                      onChange={e => setActionAssignee(e.target.value)}
+                      className="w-full border border-slate-200 rounded p-2 text-xs"
+                    />
+                  ) : (
+                    <select
+                      value={actionAssignee}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setActionAssignee(val);
+                        const found = assignees.find(a => a.username === val);
+                        if (found) {
+                          setActionAgency(found.department || found.state || "");
+                        }
+                      }}
+                      className="w-full border border-slate-200 rounded p-2 text-xs bg-white"
+                    >
+                      <option value="">-- Select Available Authority --</option>
+                      {assignees.filter(a => a.role === "FIELD_OFFICER").length > 0 && (
+                        <optgroup label="🛠️ Field Officers / Site Inspectors">
+                          {assignees
+                            .filter(a => a.role === "FIELD_OFFICER")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || a.district || a.state || "Field Inspection"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {assignees.filter(a => a.role === "GOVERNMENT_OFFICER").length > 0 && (
+                        <optgroup label="🏛️ Government / Department Officers">
+                          {assignees
+                            .filter(a => a.role === "GOVERNMENT_OFFICER")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || a.state || "State Oversight"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {assignees.filter(a => a.role === "ADMIN").length > 0 && (
+                        <optgroup label="🛡️ PMO Administrators">
+                          {assignees
+                            .filter(a => a.role === "ADMIN")
+                            .map(a => (
+                              <option key={a.username} value={a.username}>
+                                {a.full_name} ({a.username}) — {a.department || "National Oversight"}
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  )}
                 </div>
 
                 <div>

@@ -5,7 +5,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.conf import settings
-from core.models import Role, AuditEvent
+from core.models import Role, AuditEvent, User
 from core.rbac import check_user_project_scope as rbac_project_scope, has_capability, get_role
 
 # Centralized status and priority constants
@@ -834,3 +834,69 @@ class CorrectiveActionViewSet(viewsets.ViewSet):
             "count": len(history),
             "events": history
         })
+
+    @action(detail=False, methods=['get'])
+    def assignees(self, request):
+        """
+        Returns only the official authorities that have login IDs on the login portal:
+        - field_officer (Amit Patel - Field Officer / Site Verification Engineer)
+        - govt_officer (Priya Nair - Government Officer / Oversight Authority)
+        - admin (Rajesh Sharma - PMO Administrator)
+        - ramesh_kumar (Ramesh Kumar - MoRTH Officer)
+        """
+        user = request.user
+        role = getattr(user, 'role', Role.CITIZEN)
+        if role == Role.CITIZEN:
+            return Response({"error": "Forbidden: Citizens cannot view authorities list."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Exact official accounts available on the Login Portal
+        login_officials = [
+            {
+                "username": "field_officer",
+                "full_name": "Amit Patel",
+                "role": "FIELD_OFFICER",
+                "department": "National Highways Authority of India (NHAI)",
+                "state": "Himachal Pradesh",
+                "district": "Shimla"
+            },
+            {
+                "username": "govt_officer",
+                "full_name": "Priya Nair",
+                "role": "GOVERNMENT_OFFICER",
+                "department": "Ministry of Road Transport & Highways (MoRTH)",
+                "state": "Punjab",
+                "district": "Ludhiana"
+            },
+            {
+                "username": "admin",
+                "full_name": "Rajesh Sharma",
+                "role": "ADMIN",
+                "department": "MoSPI - National Infrastructure Oversight",
+                "state": "Delhi",
+                "district": "New Delhi"
+            },
+            {
+                "username": "ramesh_kumar",
+                "full_name": "Ramesh Kumar",
+                "role": "GOVERNMENT_OFFICER",
+                "department": "Ministry of Road Transport & Highways (MoRTH)",
+                "state": "All India",
+                "district": ""
+            }
+        ]
+
+        # Enrich with live database details if present
+        try:
+            db = get_shared_mongo_db()
+            if db is not None:
+                docs = {m.get('username'): m for m in db['users'].find({"role": {"$ne": "CITIZEN"}}, {"_id": 0}) if m.get('username')}
+                for o in login_officials:
+                    m = docs.get(o['username'])
+                    if m:
+                        if m.get('full_name'): o['full_name'] = m['full_name']
+                        if m.get('department'): o['department'] = m['department']
+                        if m.get('state'): o['state'] = m['state']
+        except Exception:
+            pass
+
+        return Response({"count": len(login_officials), "results": login_officials})

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../contexts/AuthContext"
 import { citizenReportService } from "../services/citizenReportService"
+import { projectService } from "../services/projectService"
+import { Project } from "../types"
 import {
   FileTextIcon,
   CheckIcon,
@@ -56,6 +58,81 @@ export default function CitizenReport() {
   const [isCopied, setIsCopied] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Real projects list from Central Registry
+  const [projectsList, setProjectsList] = useState<Project[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [projectSearch, setProjectSearch] = useState("")
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string>("")
+  const [customProjectInput, setCustomProjectInput] = useState("")
+
+  // Fetch real projects from central registry
+  useEffect(() => {
+    projectService
+      .getProjects()
+      .then((res) => {
+        const list = res.results || []
+        setProjectsList(list)
+
+        // Check query params if arriving from another screen
+        const params = new URLSearchParams(location.search)
+        const pId = params.get("projectId")
+        if (pId) {
+          const match = list.find((p) => p.project_id === pId)
+          if (match) {
+            setSelectedProjectKey(match.project_id)
+            setForm((prev) => ({ ...prev, projectId: match.project_id }))
+          } else {
+            setSelectedProjectKey("CUSTOM")
+            setCustomProjectInput(pId)
+            setForm((prev) => ({ ...prev, projectId: pId }))
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load projects in CitizenReport", err)
+      })
+      .finally(() => {
+        setLoadingProjects(false)
+      })
+  }, [location.search])
+
+  const handleProjectSelect = (val: string) => {
+    setSelectedProjectKey(val)
+    if (val === "CUSTOM") {
+      setForm((prev) => ({ ...prev, projectId: customProjectInput }))
+    } else if (val) {
+      setForm((prev) => ({ ...prev, projectId: val }))
+      const match = projectsList.find((p) => p.project_id === val)
+      if (match && !form.location.trim()) {
+        const autoLoc = [match.district, match.state].filter(Boolean).join(", ")
+        if (autoLoc) {
+          setForm((prev) => ({ ...prev, location: autoLoc }))
+        }
+      }
+    } else {
+      setForm((prev) => ({ ...prev, projectId: "" }))
+    }
+  }
+
+  const handleCustomProjectChange = (text: string) => {
+    setCustomProjectInput(text)
+    setForm((prev) => ({ ...prev, projectId: text }))
+  }
+
+  const selectedProject = projectsList.find((p) => p.project_id === form.projectId)
+
+  const filteredProjects = projectsList.filter((p) => {
+    if (!projectSearch.trim()) return true
+    const term = projectSearch.toLowerCase()
+    return (
+      p.project_id.toLowerCase().includes(term) ||
+      p.project_name.toLowerCase().includes(term) ||
+      (p.state && p.state.toLowerCase().includes(term)) ||
+      (p.sector && p.sector.toLowerCase().includes(term)) ||
+      (p.district && p.district.toLowerCase().includes(term))
+    )
+  })
 
   // Restore saved form draft if returning after login
   useEffect(() => {
@@ -140,8 +217,12 @@ export default function CitizenReport() {
       : "Guest Citizen (Public Whistleblower)"
 
     try {
+      const matchedProj = projectsList.find((p) => p.project_id === form.projectId)
       const report = await citizenReportService.submitReport({
         projectId: form.projectId,
+        projectName: matchedProj?.project_name,
+        state: matchedProj?.state,
+        department: matchedProj?.sector || matchedProj?.department,
         issueType: form.issueType,
         description: form.description,
         location: form.location,
@@ -350,18 +431,104 @@ export default function CitizenReport() {
 
       {/* Main Reporting Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-7 space-y-5 shadow-xs">
-        {/* Project ID */}
+        {/* Project Selector */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">
-            Project Identifier <span className="text-slate-400 font-normal lowercase">(optional if known)</span>
-          </label>
-          <input
-            type="text"
-            value={form.projectId}
-            onChange={(e) => setForm((p) => ({ ...p, projectId: e.target.value }))}
-            placeholder="e.g. DR-0012 or NH-48 Expansion"
-            className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-[#0b1f4b] focus:ring-1 focus:ring-[#0b1f4b] transition font-mono"
-          />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+              Target Infrastructure Project <span className="text-slate-400 font-normal lowercase">(optional if known)</span>
+            </label>
+            {projectsList.length > 0 && (
+              <span className="text-[11px] text-slate-500 font-medium">
+                {projectsList.length} Projects Available
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {/* Quick Filter Search for Fast Project Lookup */}
+            {projectsList.length > 5 && (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={projectSearch}
+                  onChange={(e) => setProjectSearch(e.target.value)}
+                  placeholder="🔍 Type to filter projects by name, ID, or state..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-[#0b1f4b] focus:ring-1 focus:ring-[#0b1f4b] bg-slate-50/70 transition"
+                />
+                {projectSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProjectSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs px-1"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Dropdown Selection */}
+            <select
+              value={selectedProjectKey}
+              onChange={(e) => handleProjectSelect(e.target.value)}
+              disabled={loadingProjects}
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 outline-none focus:border-[#0b1f4b] focus:ring-1 focus:ring-[#0b1f4b] transition bg-white cursor-pointer font-medium"
+            >
+              <option value="">
+                {loadingProjects ? "Loading projects registry..." : "-- Select Project from National Registry (or choose Other) --"}
+              </option>
+              {filteredProjects.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  {p.project_id} — {p.project_name.slice(0, 60)}{p.project_name.length > 60 ? "..." : ""} ({p.state || p.sector || "National"})
+                </option>
+              ))}
+              <option value="CUSTOM">Other / Unlisted Local Infrastructure (Enter Name)</option>
+            </select>
+
+            {/* If Custom / Unlisted is selected */}
+            {selectedProjectKey === "CUSTOM" && (
+              <div className="pt-1">
+                <input
+                  type="text"
+                  value={customProjectInput}
+                  onChange={(e) => handleCustomProjectChange(e.target.value)}
+                  placeholder="e.g. Ward 4 Ring Road Flyover or NH-48 Expansion"
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-[#0b1f4b] focus:ring-1 focus:ring-[#0b1f4b] transition font-mono bg-amber-50/20"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Enter the local work name, highway number, or landmark identifier.
+                </p>
+              </div>
+            )}
+
+            {/* Selected Project Summary Pill */}
+            {selectedProject && (
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-start justify-between gap-3 text-xs animate-fade-in">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold bg-[#0b1f4b] text-white px-2 py-0.5 rounded text-[11px]">
+                      {selectedProject.project_id}
+                    </span>
+                    <span className="font-semibold text-blue-950 truncate">
+                      {selectedProject.project_name}
+                    </span>
+                  </div>
+                  <div className="text-slate-600 text-[11px] flex items-center gap-2">
+                    <span>Sector: <strong>{selectedProject.sector || selectedProject.department || "General"}</strong></span>
+                    <span>•</span>
+                    <span>State: <strong>{selectedProject.state || "National"}</strong></span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleProjectSelect("")}
+                  className="text-xs text-blue-700 hover:text-blue-900 font-semibold shrink-0 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Issue Type */}

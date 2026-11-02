@@ -198,4 +198,11 @@ export const projectService = {
       body: JSON.stringify({ checked_items }),
     });
   },
+
+  /**
+   * Alias for updateProjectChecklist
+   */
+  async saveChecklist(id: string, checked_items: Record<string, boolean>): Promise<{ status: string; project_id: string; checked_count: number }> {
+    return projectService.updateProjectChecklist(id, checked_items);
+  },
 };

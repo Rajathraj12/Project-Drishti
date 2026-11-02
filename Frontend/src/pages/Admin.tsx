@@ -142,7 +142,8 @@ export default function Admin() {
     const nameParts = newName.trim().split(" ")
     const firstName = nameParts[0] || ""
     const lastName = nameParts.slice(1).join(" ") || ""
-    const username = newUsername.trim() || newEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_")
+    const derivedFallback = newName.trim().toLowerCase().replace(/[^a-zA-Z0-9_]/g, "_") || newEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_")
+    const username = newUsername.trim() || derivedFallback
 
     try {
       const created = await adminService.createUser({
@@ -156,8 +157,9 @@ export default function Admin() {
         is_active: true,
       })
 
-      setUsers((prev) => [created, ...prev])
-      showToast(`Account created in MongoDB & Central DB! Password is "${newName.trim()}".`)
+      setUsers((prev) => [created, ...prev.filter((u) => u.id !== created.id)])
+      const officerName = newName.trim()
+      showToast(officerName ? `Officer account for ${officerName} provisioned successfully.` : "Officer account provisioned successfully.")
       setIsModalOpen(false)
       setNewName("")
       setNewUsername("")
@@ -177,7 +179,7 @@ export default function Admin() {
     try {
       const res = await adminService.saveSettings(settings)
       setSettings(res.settings)
-      showToast("Risk engine thresholds & alert policies saved to system database!")
+      showToast("Risk engine thresholds & alert policies saved successfully.")
     } catch (err: any) {
       console.error("Save settings error:", err)
       showToast(`Failed to save settings: ${err.message || "Error"}`)
@@ -922,7 +924,7 @@ export default function Admin() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div>
-                <span className="font-bold">Permanent Deletion:</span> This account will be immediately deleted from the central directory and MongoDB Atlas. The officer will lose access to all projects and audits.
+                <span className="font-bold">Permanent Deletion:</span> This account will be immediately deleted from the official registry. The officer will lose access to all projects and audits.
               </div>
             </div>
 

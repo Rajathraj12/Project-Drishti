@@ -1,4 +1,5 @@
 
+import re
 import secrets
 from django.db.models import Q
 from rest_framework import viewsets, status, serializers
@@ -560,14 +561,15 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return User.objects.all().order_by('username')
 
-    def perform_create(self, serializer):
-        user = serializer.save()
-        raw_password = (
-            getattr(user, '_raw_password', None)
-            or f"{user.first_name} {user.last_name}".strip()
-            or user.first_name
-            or user.username
-        )
+    def _sync_officer_to_mongo(self, user, raw_password=None):
+        if not raw_password:
+            raw_password = (
+                getattr(user, '_raw_password', None)
+                or f"{user.first_name} {user.last_name}".strip()
+                or user.first_name
+                or user.username
+                or 'Officer@123'
+            )
         try:
             mongo_users = get_mongo_collection('users')
             if mongo_users is not None:
@@ -597,30 +599,78 @@ class UserViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"[MongoDB Atlas User Sync Error]: {e}")
 
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        email = (data.get('email') or '').strip().lower()
+        username = (data.get('username') or '').strip()
+        first_name = (data.get('first_name') or '').strip()
+        last_name = (data.get('last_name') or '').strip()
+        raw_password = (
+            data.get('password')
+            or f"{first_name} {last_name}".strip()
+            or first_name
+            or username
+            or 'Officer@123'
+        )
+
+        # Check if an existing account with this email exists in Central DB
+        existing_user = None
+        if email:
+            existing_user = User.objects.filter(email__iexact=email).first()
+
+        if existing_user:
+            # Retain or disambiguate username if colliding with another user
+            if username and User.objects.exclude(pk=existing_user.pk).filter(username__iexact=username).exists():
+                data['username'] = existing_user.username
+            elif not username:
+                data['username'] = existing_user.username
+
+            serializer = self.get_serializer(existing_user, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            if raw_password:
+                user.set_password(raw_password)
+                user.save()
+            self._sync_officer_to_mongo(user, raw_password)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # For a brand new user, auto-generate and disambiguate username if needed
+        if not username:
+            base_username = (first_name or (email.split('@')[0] if email else '') or 'officer').lower()
+            username = re.sub(r'[^a-zA-Z0-9_]', '_', base_username)
+
+        base_cand = username
+        counter = 1
+        while User.objects.filter(username__iexact=username).exists():
+            username = f"{base_cand}_{counter}"
+            counter += 1
+
+        data['username'] = username
+        data['email'] = email
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        user._raw_password = raw_password
+        self._sync_officer_to_mongo(user, raw_password)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        self._sync_officer_to_mongo(user)
+
     def perform_update(self, serializer):
         instance = serializer.instance
         new_role = serializer.validated_data.get('role', instance.role)
         if instance.pk == self.request.user.pk and new_role != instance.role:
-            # Admins may manage others; self-escalation/de-escalation is allowed only via admin UI
-            # but never via a non-admin identity.
             if not has_capability(self.request.user, 'manage_users'):
                 raise PermissionDenied('You cannot change your own role.')
         user = serializer.save()
-        try:
-            mongo_users = get_mongo_collection('users')
-            if mongo_users is not None:
-                mongo_users.update_one(
-                    {'$or': [{'username': user.username}, {'email': user.email}]},
-                    {'$set': {
-                        'is_active': user.is_active,
-                        'role': user.role,
-                        'department': user.department,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                    }}
-                )
-        except Exception:
-            pass
+        raw_pwd = self.request.data.get('password')
+        if raw_pwd and str(raw_pwd).strip():
+            user.set_password(str(raw_pwd).strip())
+            user.save()
+        self._sync_officer_to_mongo(user, raw_pwd)
 
     def perform_destroy(self, instance):
         username = instance.username

@@ -1,6 +1,15 @@
 import { fetchApi } from './api';
 import { CorrectiveAction, ActionAuditEvent } from '../types';
 
+export interface AssigneeAuthority {
+  username: string;
+  full_name: string;
+  role: string;
+  department?: string;
+  state?: string;
+  district?: string;
+}
+
 export const correctiveActionService = {
   /**
    * List corrective actions with optional query filters (project_id, status, priority, is_overdue, etc.)
@@ -163,5 +172,20 @@ export const correctiveActionService = {
    */
   async getActionHistory(actionId: string): Promise<{ action_id: string; count: number; events: ActionAuditEvent[] }> {
     return fetchApi<{ action_id: string; count: number; events: ActionAuditEvent[] }>(`/corrective-actions/${actionId}/history/`);
+  },
+  /**
+   * Retrieve list of assignable authorities/officers
+   */
+  async getAssignees(): Promise<AssigneeAuthority[]> {
+    try {
+      const res = await fetchApi<{ count: number; results: AssigneeAuthority[] }>('/corrective-actions/assignees/');
+      return res.results || [];
+    } catch {
+      return [
+        { username: "field_officer", full_name: "Amit Patel", role: "FIELD_OFFICER", department: "NHAI", state: "Himachal Pradesh" },
+        { username: "govt_officer", full_name: "Priya Nair", role: "GOVERNMENT_OFFICER", department: "Ministry of Road Transport and Highways", state: "Punjab" },
+        { username: "admin", full_name: "Rajesh Sharma", role: "ADMIN", department: "MoSPI - National Infrastructure Oversight", state: "Delhi" }
+      ];
+    }
   },
 };

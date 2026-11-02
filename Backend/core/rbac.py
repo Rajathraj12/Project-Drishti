@@ -2,6 +2,7 @@
 
 Backend is the authority. Frontend copies of this matrix are UX-only.
 """
+import re
 from core.models import Role
 
 PUBLIC_PROJECT_FIELDS = (
@@ -174,7 +175,7 @@ def is_central_ministry(user):
     if not dept:
         return False
     d = str(dept).strip().lower()
-    return 'ministry' in d or 'central' in d or 'mospi' in d
+    return any(k in d for k in ('ministry', 'central', 'mospi', 'nic', 'pmo', 'oversight', 'audit'))
 
 def dept_matches(user_dept, project_dept_or_sector):
     if not user_dept or not project_dept_or_sector:
@@ -183,11 +184,17 @@ def dept_matches(user_dept, project_dept_or_sector):
     pd = str(project_dept_or_sector).strip().lower()
     if ud == pd or ud in pd or pd in ud:
         return True
+    if any(k in ud for k in ('mospi', 'oversight', 'pmo', 'nic', 'audit', 'general', 'infrastructure oversight', 'central infrastructure', 'all')):
+        return True
     if ('highway' in ud or 'road' in ud or 'nhai' in ud or 'morth' in ud) and ('road' in pd or 'highway' in pd):
         return True
     if 'rail' in ud and 'rail' in pd:
         return True
-    if ('power' in ud or 'energy' in ud or 'electric' in ud) and ('power' in pd or 'energy' in pd or 'electric' in pd):
+    if ('power' in ud or 'energy' in ud or 'electric' in ud) and ('power' in pd or 'energy' in pd or 'electric' in pd or 'transmission' in pd):
+        return True
+    if ('water' in ud or 'jal' in ud) and ('water' in pd or 'jal' in pd):
+        return True
+    if ('urban' in ud or 'metro' in ud or 'transport' in ud) and ('urban' in pd or 'metro' in pd or 'transport' in pd):
         return True
     return False
 
@@ -199,8 +206,9 @@ def matches_jurisdiction(user, project_doc):
     # Central ministries have nationwide jurisdiction across all states
     if is_central_ministry(user):
         return True
-    if user.state and project_doc.get('state') and not state_matches(user.state, project_doc.get('state')):
-        return False
+    if user.state and str(user.state).strip().lower() not in ('all india', 'national / all states', 'national', 'all', 'all states', 'all jurisdictions', 'unspecified'):
+        if project_doc.get('state') and not state_matches(user.state, project_doc.get('state')):
+            return False
     return True
 
 
@@ -312,20 +320,29 @@ def mongo_project_query(user):
             jurisdiction_or.append({'project_id': {'$in': assigned}})
             
         state_cond = {}
-        if user.state:
+        if user.state and str(user.state).strip().lower() not in (
+            'all india', 'national / all states', 'national', 'all', 'all states', 'all jurisdictions', 'unspecified'
+        ):
             state_cond['state'] = state_query_clause(user.state)
         
         dept_cond = []
         if user.department:
             ud = user.department.lower()
-            if 'road' in ud or 'highway' in ud or 'nhai' in ud or 'morth' in ud:
+            # National / multi-sector oversight agencies oversee all infrastructure sectors
+            if any(k in ud for k in ('mospi', 'oversight', 'pmo', 'nic', 'audit', 'general', 'infrastructure oversight', 'central infrastructure', 'all')):
+                dept_cond = []
+            elif 'road' in ud or 'highway' in ud or 'nhai' in ud or 'morth' in ud:
                 dept_cond = [{'sector': {'$regex': 'road|highway', '$options': 'i'}}, {'department': {'$regex': 'road|highway', '$options': 'i'}}]
             elif 'rail' in ud:
                 dept_cond = [{'sector': {'$regex': 'rail', '$options': 'i'}}, {'department': {'$regex': 'rail', '$options': 'i'}}]
-            elif 'power' in ud or 'energy' in ud:
-                dept_cond = [{'sector': {'$regex': 'power|energy', '$options': 'i'}}, {'department': {'$regex': 'power|energy', '$options': 'i'}}]
+            elif 'power' in ud or 'energy' in ud or 'electric' in ud:
+                dept_cond = [{'sector': {'$regex': 'power|energy|electric|transmission', '$options': 'i'}}, {'department': {'$regex': 'power|energy|electric|transmission', '$options': 'i'}}]
+            elif 'water' in ud or 'jal' in ud:
+                dept_cond = [{'sector': {'$regex': 'water|jal', '$options': 'i'}}, {'department': {'$regex': 'water|jal', '$options': 'i'}}]
+            elif 'urban' in ud or 'metro' in ud or 'transport' in ud:
+                dept_cond = [{'sector': {'$regex': 'urban|transport|metro', '$options': 'i'}}, {'department': {'$regex': 'urban|transport|metro', '$options': 'i'}}]
             else:
-                dept_cond = [{'department': user.department}, {'sector': user.department}]
+                dept_cond = [{'sector': {'$regex': re.escape(user.department), '$options': 'i'}}, {'department': {'$regex': re.escape(user.department), '$options': 'i'}}]
                 
         # Central ministry officers have nationwide jurisdiction for their sector
         if is_central_ministry(user):

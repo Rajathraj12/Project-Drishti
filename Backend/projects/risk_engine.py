@@ -54,46 +54,68 @@ def analyze_project_risk(project: Dict[str, Any]) -> Dict[str, Any]:
     if current_cost and current_cost > 0 and expenditure:
         financial_utilization = (expenditure / current_cost) * 100
         
-    # 1. Cost overrun
+    # 1. Cost overrun (Max Weight: 35)
     if original_cost and revised_cost and revised_cost > original_cost:
         overrun = revised_cost - original_cost
         pct_overrun = (overrun / original_cost) * 100
-        total_score += CONFIG["WEIGHT_COST_OVERRUN"]
+        
+        # Graduated scoring based on percentage overrun
+        if pct_overrun >= 50.0:
+            points = CONFIG["WEIGHT_COST_OVERRUN"]
+            severity = "High"
+        elif pct_overrun >= 25.0:
+            points = int(round(25 + ((pct_overrun - 25.0) / 25.0) * 9))
+            severity = "High"
+        elif pct_overrun >= 10.0:
+            points = int(round(15 + ((pct_overrun - 10.0) / 15.0) * 9))
+            severity = "Medium"
+        elif pct_overrun >= 3.0:
+            points = int(round(5 + ((pct_overrun - 3.0) / 7.0) * 9))
+            severity = "Low"
+        else:
+            points = max(1, int(round((pct_overrun / 3.0) * 4)))
+            severity = "Low"
+
+        total_score += points
         rules_triggered.append({
             "rule_id": "COST_OVERRUN",
             "title": "Cost Overrun",
-            "severity": "High",
-            "points": CONFIG["WEIGHT_COST_OVERRUN"],
-            "description": f"Revised cost exceeds original cost by {pct_overrun:.1f}%.",
-            "observed_values": {"original": original_cost, "revised": revised_cost},
+            "severity": severity,
+            "points": points,
+            "description": f"Revised cost exceeds original cost by {pct_overrun:.1f}% ({points} pts).",
+            "observed_values": {"original": original_cost, "revised": revised_cost, "pct_overrun": round(pct_overrun, 2)},
             "threshold": f"> {original_cost}"
         })
         
-    # 2. Low reported progress
+    # 2. Low reported progress (Max Weight: 15)
     if reported_progress is not None and reported_progress < CONFIG["LOW_PROGRESS_THRESHOLD"]:
-        total_score += CONFIG["WEIGHT_LOW_PROGRESS"]
+        deficit_ratio = (CONFIG["LOW_PROGRESS_THRESHOLD"] - reported_progress) / CONFIG["LOW_PROGRESS_THRESHOLD"]
+        points = max(3, int(round(deficit_ratio * CONFIG["WEIGHT_LOW_PROGRESS"])))
+        total_score += points
         rules_triggered.append({
             "rule_id": "LOW_PROGRESS",
             "title": "Low Physical Progress",
-            "severity": "Medium",
-            "points": CONFIG["WEIGHT_LOW_PROGRESS"],
-            "description": f"Physical progress ({reported_progress}%) is critically low.",
+            "severity": "High" if reported_progress < 10.0 else "Medium",
+            "points": points,
+            "description": f"Physical progress ({reported_progress}%) is critically low ({points} pts).",
             "observed_values": {"progress": reported_progress},
             "threshold": f"< {CONFIG['LOW_PROGRESS_THRESHOLD']}%"
         })
         
-    # 3. Financial utilization vs physical progress mismatch
+    # 3. Financial utilization vs physical progress mismatch (Max Weight: 30)
     if reported_progress is not None and financial_utilization > 0:
         mismatch = financial_utilization - reported_progress
         if mismatch > CONFIG["UTILIZATION_MISMATCH_THRESHOLD"]:
-            total_score += CONFIG["WEIGHT_UTILIZATION_MISMATCH"]
+            excess = mismatch - CONFIG["UTILIZATION_MISMATCH_THRESHOLD"]
+            points = min(CONFIG["WEIGHT_UTILIZATION_MISMATCH"], int(round(15 + min(1.0, excess / 30.0) * 15)))
+            total_score += points
             rules_triggered.append({
                 "rule_id": "UTILIZATION_MISMATCH",
                 "title": "Utilization-Progress Mismatch",
                 "severity": "High",
-                "points": CONFIG["WEIGHT_UTILIZATION_MISMATCH"],
-                "description": f"Financial utilization ({financial_utilization:.1f}%) significantly exceeds physical progress ({reported_progress}%).",
-                "observed_values": {"utilization": round(financial_utilization, 2), "progress": reported_progress},
+                "points": points,
+                "description": f"Financial utilization ({financial_utilization:.1f}%) significantly exceeds physical progress ({reported_progress}%) ({points} pts).",
+                "observed_values": {"utilization": round(financial_utilization, 2), "progress": reported_progress, "mismatch": round(mismatch, 2)},
                 "threshold": f"Difference > {CONFIG['UTILIZATION_MISMATCH_THRESHOLD']}%"
             })
             

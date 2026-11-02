@@ -28,7 +28,13 @@ env/
 ENV/
 env.bak/
 venv.bak/
+# Environment and secrets
 .env
+.env.*
+*.env
+*.env.local
+Backend/.env*
+Frontend/.env*
 
 # Database
 Backend/db.sqlite3

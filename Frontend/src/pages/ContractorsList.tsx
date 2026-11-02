@@ -9,6 +9,15 @@ export default function ContractorsList() {
   const [search, setSearch] = useState("")
   const [selectedSector, setSelectedSector] = useState<string>("ALL")
   const [riskFilter, setRiskFilter] = useState<"ALL" | "High" | "Medium" | "Low">("ALL")
+  const [showRatingGuide, setShowRatingGuide] = useState(false)
+
+  const getRatingTooltip = (rating: string) => {
+    if (rating === "AAA") return "AAA: Prime Grade — Highest solvency & >90% on-time execution (Lowest risk)";
+    if (rating.startsWith("AA")) return `${rating}: High Grade — Strong operational & capital capacity (80–90% on-time)`;
+    if (rating.startsWith("A")) return `${rating}: Upper Medium — Adequate operational resilience & standard delivery`;
+    if (rating.startsWith("BBB")) return `${rating}: Moderate / Watch — Higher sensitivity to delays; requires oversight`;
+    return `${rating}: Institutional Credit Rating`;
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -87,15 +96,113 @@ export default function ContractorsList() {
           </p>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-2">
+        {/* Search & Rating Scale Guide */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          {/* Credit Rating Guide Popover */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowRatingGuide(!showRatingGuide)}
+              onMouseEnter={() => setShowRatingGuide(true)}
+              className="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 text-slate-700 px-3 py-2 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer"
+              title="Click or hover to inspect Credit Rating scale"
+            >
+              <span className="text-blue-700 font-mono font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[11px]">
+                AAA–BBB
+              </span>
+              <span className="text-slate-700 font-bold">Rating Guide</span>
+              <span className="text-blue-500 text-xs">ℹ️</span>
+            </button>
+
+            {/* Hover / Click Dropdown Card */}
+            {showRatingGuide && (
+              <div 
+                onMouseLeave={() => setShowRatingGuide(false)}
+                className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-2xl p-4 z-40 text-xs animate-in fade-in zoom-in-95"
+              >
+                <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🏷️</span>
+                    <span className="font-bold text-navy-900 text-sm">Contractor Credit & Delivery Ratings</span>
+                  </div>
+                  <button 
+                    onClick={() => setShowRatingGuide(false)}
+                    className="text-slate-400 hover:text-slate-600 text-sm px-1 leading-none cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                  Institutional creditworthiness and project delivery ratings benchmarked against audited public procurement records:
+                </p>
+
+                <div className="space-y-2.5">
+                  <div className="p-2 rounded-lg bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
+                    <span className="font-mono font-bold text-blue-700 bg-white border border-blue-300 px-1.5 py-0.5 rounded text-[10px] shrink-0 shadow-xs">
+                      AAA
+                    </span>
+                    <div>
+                      <div className="font-bold text-navy-900 text-xs">Prime / Exceptional Grade</div>
+                      <div className="text-[11px] text-slate-600 mt-0.5">
+                        Highest solvency and capital capacity; &gt;90% on-time project execution with negligible default risk.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-start gap-2.5">
+                    <span className="font-mono font-bold text-blue-700 bg-white border border-blue-200 px-1.5 py-0.5 rounded text-[10px] shrink-0 shadow-xs">
+                      AA / AA+ / AA-
+                    </span>
+                    <div>
+                      <div className="font-bold text-slate-800 text-xs">High Grade Capacity</div>
+                      <div className="text-[11px] text-slate-600 mt-0.5">
+                        Strong financial reserves and reliable track record (80%–90% on-time delivery across national tranches).
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex items-start gap-2.5">
+                    <span className="font-mono font-bold text-sky-700 bg-white border border-sky-200 px-1.5 py-0.5 rounded text-[10px] shrink-0 shadow-xs">
+                      A / A+
+                    </span>
+                    <div>
+                      <div className="font-bold text-slate-800 text-xs">Upper Medium Grade</div>
+                      <div className="text-[11px] text-slate-600 mt-0.5">
+                        Standard operational capability; satisfactory debt-service capacity but minor sensitivity to price fluctuations.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-amber-50/60 border border-amber-100 flex items-start gap-2.5">
+                    <span className="font-mono font-bold text-amber-700 bg-white border border-amber-300 px-1.5 py-0.5 rounded text-[10px] shrink-0 shadow-xs">
+                      BBB / BBB+
+                    </span>
+                    <div>
+                      <div className="font-bold text-amber-900 text-xs">Moderate / Oversight Watch</div>
+                      <div className="text-[11px] text-slate-600 mt-0.5">
+                        Higher variance in milestone compliance; subject to intensive physical inspection and SLA monitoring.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Source: CRISIL / ICRA & MoSPI Historical Track Record</span>
+                  <span className="font-mono text-navy-800 font-bold">Drishti Compliance</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Search */}
           <div className="relative">
             <input
               type="text"
               placeholder="Search contractor, ID, HQ..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-slate-300 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 w-64 shadow-sm"
+              className="border border-slate-300 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 w-64 shadow-sm bg-white"
             />
             <span className="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
             {search && (
@@ -255,7 +362,7 @@ export default function ContractorsList() {
                         <span className="text-[11px] font-mono font-bold text-navy-600 bg-navy-50 px-2 py-0.5 rounded">
                           {c.id}
                         </span>
-                        <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded" title="Institutional Credit & Track Record Rating">
+                        <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded cursor-help" title={getRatingTooltip(c.creditRating)}>
                           {c.creditRating}
                         </span>
                         <span className="text-[11px] text-slate-400 font-mono">

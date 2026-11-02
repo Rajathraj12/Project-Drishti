@@ -6,12 +6,28 @@ Run from the Backend directory:
     python seed_citizen_reports.py
 """
 import os
+from pathlib import Path
 from pymongo import MongoClient
 
-MONGO_URI = os.getenv(
-    "MONGO_URI",
-    "mongodb+srv://rajathclans12_db_user:DLZg8sm4czlWsybG@drishti.elxloqs.mongodb.net/",
-)
+def _get_mongo_uri():
+    uri = os.getenv("MONGO_URI")
+    if uri:
+        return uri
+    # Check Backend/.env or root .env
+    for candidate in [Path(__file__).resolve().parent / ".env", Path(__file__).resolve().parent.parent / ".env"]:
+        if candidate.exists():
+            with open(candidate, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("MONGO_URI=") and not line.startswith("#"):
+                        val = line.split("=", 1)[1].strip("'\"")
+                        if val:
+                            return val
+    return None
+
+MONGO_URI = _get_mongo_uri()
+if not MONGO_URI:
+    raise SystemExit("[Security Error]: MONGO_URI is not set. Please define MONGO_URI in Backend/.env or environment variables.")
 
 SEED_REPORTS = [
     {

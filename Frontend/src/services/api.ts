@@ -28,7 +28,32 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   });
 
   if (!response.ok) {
-    const error = new Error(`API Error: ${response.status} ${response.statusText}`) as Error & { status?: number };
+    let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+    try {
+      const errData = await response.json();
+      if (errData) {
+        if (typeof errData === 'string') {
+          errorMessage = errData;
+        } else if (errData.detail) {
+          errorMessage = errData.detail;
+        } else if (errData.error) {
+          errorMessage = errData.error;
+        } else if (errData.message) {
+          errorMessage = errData.message;
+        } else if (typeof errData === 'object') {
+          // Format serializer field errors e.g. { username: ["A user with that username already exists."] }
+          const fieldMsgs = Object.entries(errData)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+            .join(' | ');
+          if (fieldMsgs) {
+            errorMessage = fieldMsgs;
+          }
+        }
+      }
+    } catch {
+      // Non-JSON response
+    }
+    const error = new Error(errorMessage) as Error & { status?: number; data?: any };
     error.status = response.status;
     throw error;
   }

@@ -1,10 +1,71 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { projectService } from "../services/projectService";
+import { correctiveActionService } from "../services/correctiveActionService";
 import { Project } from "../types";
 
 type Status = "All" | "Flagged Divergence" | "In Progress" | "Review Required" | "Assigned" | "Completed";
 type AuditTier = "all" | "tier1" | "tier2" | "tier3" | "tier4";
+
+interface OfficialMember {
+  username: string;
+  full_name: string;
+  role: "FIELD_OFFICER" | "GOVERNMENT_OFFICER" | "ADMIN";
+  roleTitle: string;
+  department: string;
+  division: string;
+  state: string;
+  avatarColor: string;
+  category: "field" | "govt" | "admin";
+}
+
+const OFFICIAL_LOGIN_MEMBERS: OfficialMember[] = [
+  {
+    username: "field_officer",
+    full_name: "Amit Patel",
+    role: "FIELD_OFFICER",
+    roleTitle: "Field Verification Officer / Senior Site Inspector",
+    department: "National Highways Authority of India (NHAI)",
+    division: "NHAI Project Div-IV (Northern Zone)",
+    state: "Himachal Pradesh / Punjab",
+    avatarColor: "#d97706",
+    category: "field",
+  },
+  {
+    username: "govt_officer",
+    full_name: "Priya Nair",
+    role: "GOVERNMENT_OFFICER",
+    roleTitle: "Department & State Oversight Officer",
+    department: "Ministry of Road Transport & Highways (MoRTH)",
+    division: "MoRTH State Technical Monitoring Wing",
+    state: "Punjab / All States",
+    avatarColor: "#0d9488",
+    category: "govt",
+  },
+  {
+    username: "ramesh_kumar",
+    full_name: "Ramesh Kumar",
+    role: "GOVERNMENT_OFFICER",
+    roleTitle: "Ministry Oversight Officer / Superintending Engineer",
+    department: "Ministry of Road Transport & Highways (MoRTH)",
+    division: "Central Highways Infrastructure Cell",
+    state: "National / All States",
+    avatarColor: "#0284c7",
+    category: "govt",
+  },
+  {
+    username: "admin",
+    full_name: "Rajesh Sharma",
+    role: "ADMIN",
+    roleTitle: "National PMO Administrator",
+    department: "MoSPI - National Infrastructure Oversight",
+    division: "Cabinet Secretariat PMO Directorate",
+    state: "Delhi",
+    avatarColor: "#1e3a8a",
+    category: "admin",
+  },
+];
 
 interface InspectionItem {
   id: string;
@@ -389,6 +450,53 @@ export default function Inspections() {
   const [modalType, setModalType] = useState<"upload" | "schedule" | "notice" | null>(null);
   const [uploadCategory, setUploadCategory] = useState("Photo");
 
+  // Current user from auth context
+  const { user } = useAuth();
+
+  // Scheduled Inspections persisted in localStorage
+  const STORAGE_KEY_SCHEDULED = "drishti_scheduled_inspections";
+  const [scheduledInspections, setScheduledInspections] = useState<InspectionItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SCHEDULED);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to load scheduled inspections", e);
+    }
+    return [];
+  });
+
+  // Schedule modal form state
+  const [scheduleProjectId, setScheduleProjectId] = useState<string>("");
+  const [scheduleAssignee, setScheduleAssignee] = useState<string>("field_officer");
+  const [scheduleCheckpointNum, setScheduleCheckpointNum] = useState<string>("04");
+  const [scheduleTier, setScheduleTier] = useState<InspectionItem["tier"]>("Tier 3: Ground");
+  const [scheduleDate, setScheduleDate] = useState<string>(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+  const [scheduleNotes, setScheduleNotes] = useState<string>("");
+  const [dispatchSuccess, setDispatchSuccess] = useState<{ title: string; detail: string } | null>(null);
+
+  // Official login accounts list merged with current logged-in user if custom
+  const officialMembers = useMemo((): OfficialMember[] => {
+    const list = [...OFFICIAL_LOGIN_MEMBERS];
+    if (user && user.username && !list.find((m) => m.username === user.username)) {
+      const roleCat: "field" | "govt" | "admin" =
+        user.role === "FIELD_OFFICER" ? "field" : user.role === "ADMIN" ? "admin" : "govt";
+      list.push({
+        username: user.username,
+        full_name: user.full_name || `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username,
+        role: (user.role as any) || "FIELD_OFFICER",
+        roleTitle: user.department || "Designated Verification Authority",
+        department: user.department || "Ministry / Project Oversight",
+        division: user.state || "State Operations",
+        state: user.state || "National",
+        avatarColor: "#059669",
+        category: roleCat,
+      });
+    }
+    return list;
+  }, [user]);
+
   // Load real projects and MongoDB checklists from backend
   useEffect(() => {
     projectService
@@ -421,7 +529,7 @@ export default function Inspections() {
   }, []);
 
   // Generate enriched statutory inspection list (deterministic from project_id)
-  const inspections: InspectionItem[] = useMemo(() => {
+  const generatedInspections: InspectionItem[] = useMemo(() => {
     if (projectsList.length === 0) {
       // Fallback baseline projects
       return [
@@ -582,6 +690,152 @@ export default function Inspections() {
     });
   }, [projectsList]);
 
+  // Unified inspections list: prepend user-scheduled inspections to generated ones
+  const inspections: InspectionItem[] = useMemo(() => {
+    const scheduledIds = new Set(scheduledInspections.map((s) => s.id));
+    const rest = generatedInspections.filter((g) => !scheduledIds.has(g.id));
+    return [...scheduledInspections, ...rest];
+  }, [scheduledInspections, generatedInspections]);
+
+  // Target project currently selected in the Schedule Field Inspection modal
+  const targetProj = useMemo(() => {
+    if (projectsList.length === 0) {
+      return {
+        project_id: "DR-0001",
+        project_name: "Delhi-Amritsar-Katra Expressway Phase-I (Punjab Section)",
+        state: "Punjab",
+        department: "Roads & Highways",
+        sector: "Roads & Highways",
+        reported_progress: 42.0,
+        risk_score: 85,
+      } as Project;
+    }
+    return projectsList.find((p) => p.project_id === scheduleProjectId) || projectsList[0];
+  }, [projectsList, scheduleProjectId]);
+
+  // Target project sector category
+  const targetCat = useMemo((): SectorCategory => {
+    return resolveSectorCategory(targetProj.sector || targetProj.department, targetProj.project_name);
+  }, [targetProj]);
+
+  // Target project sector checkpoints
+  const targetCheckpoints = useMemo(() => {
+    return getSectorCheckpoints(targetCat);
+  }, [targetCat]);
+
+  // Authority currently selected in the Schedule Field Inspection modal
+  const selectedAuthority = useMemo((): OfficialMember => {
+    return officialMembers.find((m) => m.username === scheduleAssignee) || officialMembers[0];
+  }, [officialMembers, scheduleAssignee]);
+
+  // Handler to open Schedule modal with prefilled context and role-based defaults
+  const handleOpenScheduleModal = () => {
+    const defaultProjId =
+      selectedInspection?.project || (projectsList.length > 0 ? projectsList[0].project_id : "DR-0001");
+    setScheduleProjectId(defaultProjId);
+
+    const proj = projectsList.find((p) => p.project_id === defaultProjId);
+    const cat = resolveSectorCategory(proj?.sector || proj?.department, proj?.project_name);
+    const cps = getSectorCheckpoints(cat);
+    if (cps.length > 0) {
+      setScheduleCheckpointNum(cps[0].num);
+    }
+
+    // Role-based authority default:
+    // If the logged-in user is a field officer, default to them; otherwise default to primary field officer Amit Patel
+    if (user?.role === "FIELD_OFFICER" && user?.username) {
+      setScheduleAssignee(user.username);
+    } else {
+      setScheduleAssignee("field_officer");
+    }
+
+    setScheduleTier("Tier 3: Ground");
+    setScheduleDate(new Date().toISOString().split("T")[0]);
+    setScheduleNotes("");
+    setModalType("schedule");
+  };
+
+  // Dispatch scheduled inspection
+  const handleDispatchInspection = () => {
+    if (!targetProj) return;
+
+    const cpObj = targetCheckpoints.find((c) => c.num === scheduleCheckpointNum) || targetCheckpoints[0];
+    const uniqueId = `INS-SCH-${targetProj.project_id}-${Date.now().toString().slice(-4)}`;
+
+    const formattedDate = scheduleDate
+      ? new Date(scheduleDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+    const claimed = targetProj.reported_progress != null ? Number(targetProj.reported_progress) : 38.5;
+
+    const newInspection: InspectionItem = {
+      id: uniqueId,
+      project: targetProj.project_id,
+      name: targetProj.project_name,
+      state: targetProj.state || "National",
+      department: targetProj.department || targetProj.sector || "Infrastructure",
+      sector: targetProj.sector || targetProj.department || "Roads & Highways",
+      claimedProgress: Number(claimed.toFixed(1)),
+      auditedProgress: 0.0,
+      progressGap: Number(claimed.toFixed(1)),
+      risk: targetProj.risk_score || 45,
+      assigned: selectedAuthority.full_name,
+      division: selectedAuthority.division || selectedAuthority.department,
+      date: formattedDate,
+      status: "Assigned",
+      checkpoint: cpObj.name,
+      checkpointNum: cpObj.num,
+      trancheHeldCr: 0,
+      tier: scheduleTier,
+      anomalyFinding: scheduleNotes.trim()
+        ? `Statutory Field Order: ${scheduleNotes.trim()} (Scope: Checkpoint ${cpObj.num})`
+        : `Statutory Section 65B inspection order dispatched to ${selectedAuthority.full_name} (${selectedAuthority.roleTitle}). Physical site measurement pending.`,
+      evidenceCount: 0,
+    };
+
+    const updated = [newInspection, ...scheduledInspections.filter((i) => i.id !== uniqueId)];
+    setScheduledInspections(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_SCHEDULED, JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save scheduled inspections", e);
+    }
+
+    // Focus immediately on newly scheduled inspection
+    setSelectedInspectionId(newInspection.id);
+    try {
+      localStorage.setItem(STORAGE_KEY_SELECTED_INSP, newInspection.id);
+    } catch (e) {}
+
+    // Ensure it is visible in the table filter
+    if (filterStatus !== "All" && filterStatus !== "Assigned") {
+      setFilterStatus("All");
+    }
+
+    setModalType(null);
+
+    setDispatchSuccess({
+      title: `Statutory Field Inspection Order Dispatched (#${uniqueId})`,
+      detail: `Assigned to ${selectedAuthority.full_name} (${selectedAuthority.username} • ${selectedAuthority.roleTitle}) for ${targetProj.project_id}. Task synced with Field App.`,
+    });
+
+    setTimeout(() => {
+      setDispatchSuccess(null);
+    }, 6000);
+  };
+
+  // Revoke / Cancel a scheduled inspection
+  const handleRevokeScheduledInspection = (idToRevoke: string) => {
+    const updated = scheduledInspections.filter((i) => i.id !== idToRevoke);
+    setScheduledInspections(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY_SCHEDULED, JSON.stringify(updated));
+    } catch (e) {}
+    if (selectedInspectionId === idToRevoke) {
+      setSelectedInspectionId(null);
+    }
+  };
+
   // Set default selected inspection (preserving user selection across refresh)
   useEffect(() => {
     if (inspections.length > 0) {
@@ -686,11 +940,11 @@ export default function Inspections() {
     // 2. Persist directly to MongoDB Atlas
     setSyncingMongo(true);
     projectService
-      .saveChecklist(projectId, updatedChecks)
+      .updateProjectChecklist(projectId, updatedChecks)
       .then(() => {
         console.log(`Saved checklist for ${projectId} to MongoDB Atlas.`);
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.warn(`Could not save checklist to MongoDB Atlas, cached locally:`, err);
       })
       .finally(() => {
@@ -752,7 +1006,7 @@ export default function Inspections() {
 
           <div className="flex items-center gap-2.5 flex-shrink-0">
             <button
-              onClick={() => setModalType("schedule")}
+              onClick={handleOpenScheduleModal}
               className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <span>+ Schedule Field Inspection</span>
@@ -766,6 +1020,25 @@ export default function Inspections() {
             </button>
           </div>
         </div>
+
+        {/* Success Dispatch Alert Banner */}
+        {dispatchSuccess && (
+          <div className="mb-5 bg-emerald-50 border border-emerald-300 text-emerald-950 px-4 py-3 rounded-xl shadow-xs flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">✅</span>
+              <div>
+                <div className="font-bold text-xs text-emerald-900">{dispatchSuccess.title}</div>
+                <div className="text-[11px] text-emerald-700 font-medium">{dispatchSuccess.detail}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setDispatchSuccess(null)}
+              className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-1 rounded-md hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              Dismiss ✕
+            </button>
+          </div>
+        )}
 
         {/* 4 Sleek Oversight Metric Cards (Matching Evidence style) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1054,6 +1327,8 @@ export default function Inspections() {
                             className={`text-[10px] font-black px-2 py-0.8 rounded-full inline-flex items-center gap-1 ${
                               insp.status === "Flagged Divergence"
                                 ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                : insp.status === "Assigned"
+                                ? "bg-blue-100 text-blue-800 border border-blue-300"
                                 : insp.status === "In Progress"
                                 ? "bg-amber-100 text-amber-800 border border-amber-300"
                                 : insp.status === "Review Required"
@@ -1064,6 +1339,7 @@ export default function Inspections() {
                             }`}
                           >
                             {insp.status === "Flagged Divergence" && <span>⚠️</span>}
+                            {insp.status === "Assigned" && <span>📋</span>}
                             <span>{insp.status}</span>
                           </span>
                         </td>
@@ -1102,7 +1378,15 @@ export default function Inspections() {
                       className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                         selectedInspection.status === "Flagged Divergence"
                           ? "bg-rose-100 text-rose-800 border border-rose-300"
-                          : "bg-sky-100 text-sky-800 border border-sky-300"
+                          : selectedInspection.status === "Assigned"
+                          ? "bg-blue-100 text-blue-800 border border-blue-300"
+                          : selectedInspection.status === "In Progress"
+                          ? "bg-amber-100 text-amber-800 border border-amber-300"
+                          : selectedInspection.status === "Review Required"
+                          ? "bg-sky-100 text-sky-800 border border-sky-300"
+                          : selectedInspection.status === "Completed"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : "bg-slate-100 text-slate-800 border border-slate-300"
                       }`}
                     >
                       {selectedInspection.status}
@@ -1131,15 +1415,29 @@ export default function Inspections() {
                   </div>
 
                   {/* Physical Progress Divergence Box */}
-                  <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-2.5 mt-2">
-                    <div className="flex items-center justify-between text-xs font-mono font-bold text-rose-900 mb-1">
-                      <span>Contractor Claim: {selectedInspection.claimedProgress}%</span>
-                      <span>Audit: {selectedInspection.auditedProgress}%</span>
+                  {selectedInspection.status === "Assigned" ? (
+                    <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-2.5 mt-2">
+                      <div className="flex items-center justify-between text-xs font-mono font-bold text-blue-900 mb-1">
+                        <span>Contractor Claim: {selectedInspection.claimedProgress}%</span>
+                        <span className="text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded text-[10px] font-bold">
+                          Assigned: Pending Field Verification
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-blue-800 leading-tight">
+                        <strong>Statutory Order Dispatched:</strong> Assigned to <strong>{selectedInspection.assigned}</strong> ({selectedInspection.division}) under Section 65B for Checkpoint {selectedInspection.checkpointNum} ground physical measurement.
+                      </div>
                     </div>
-                    <div className="text-[11px] text-rose-800 leading-tight">
-                      <strong>Audit Shortfall: -{selectedInspection.progressGap}%</strong> · ₹{selectedInspection.trancheHeldCr} Cr withheld at Checkpoint 05 {getShortfallReason(selectedSectorCat)}
+                  ) : (
+                    <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-2.5 mt-2">
+                      <div className="flex items-center justify-between text-xs font-mono font-bold text-rose-900 mb-1">
+                        <span>Contractor Claim: {selectedInspection.claimedProgress}%</span>
+                        <span>Audit: {selectedInspection.auditedProgress}%</span>
+                      </div>
+                      <div className="text-[11px] text-rose-800 leading-tight">
+                        <strong>Audit Shortfall: -{selectedInspection.progressGap}%</strong> · ₹{selectedInspection.trancheHeldCr} Cr withheld at Checkpoint 05 {getShortfallReason(selectedSectorCat)}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Statutory Section 65B Field Checklist */}
@@ -1308,6 +1606,15 @@ export default function Inspections() {
                       Project Profile
                     </button>
                   </div>
+
+                  {selectedInspection.id.startsWith("INS-SCH-") && (
+                    <button
+                      onClick={() => handleRevokeScheduledInspection(selectedInspection.id)}
+                      className="w-full py-2 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-300 hover:border-rose-300 font-bold text-[11px] rounded-lg transition-all cursor-pointer text-center"
+                    >
+                      Revoke Scheduled Order ✕
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1326,7 +1633,7 @@ export default function Inspections() {
       {/* Interactive Modals */}
       {modalType && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             {/* Upload Modal */}
             {modalType === "upload" && (
               <div>
@@ -1379,7 +1686,10 @@ export default function Inspections() {
             {modalType === "schedule" && (
               <div>
                 <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                  <div className="text-base font-bold text-[#0b1f4b]">Schedule Field Inspection</div>
+                  <div className="text-base font-bold text-[#0b1f4b] flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-blue-50 text-blue-700 text-sm">📋</span>
+                    <span>Schedule Field Inspection</span>
+                  </div>
                   <button onClick={() => setModalType(null)} className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">
                     ✕
                   </button>
@@ -1388,41 +1698,213 @@ export default function Inspections() {
                   Assign statutory physical inspection or drone flyover under Section 65B protocol.
                 </p>
 
-                <div className="space-y-3 text-xs mb-4">
+                {/* Dispatcher Session Details */}
+                {user && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-[11px] mb-3">
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <span className="font-bold text-[#0b1f4b]">Authorizing Officer:</span>
+                      <span className="font-semibold text-slate-800">{user.full_name || user.first_name || user.username}</span>
+                      <span className="font-mono text-[10px] text-slate-500">(@{user.username})</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-700">
+                      {user.role}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-3.5 text-xs mb-4">
+                  {/* Target Project */}
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Target Project</label>
-                    <select className="w-full p-2 rounded-lg border border-slate-300 font-medium">
-                      {inspections.slice(0, 8).map((p) => (
-                        <option key={p.project} value={p.project}>
-                          {p.project} — {p.name.slice(0, 40)}...
+                    <label className="block text-slate-700 font-bold mb-1 flex items-center justify-between">
+                      <span>Target Project</span>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        {projectsList.length} Registered Infrastructure Projects
+                      </span>
+                    </label>
+                    <select
+                      value={scheduleProjectId}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        setScheduleProjectId(newId);
+                        const proj = projectsList.find((p) => p.project_id === newId);
+                        if (proj) {
+                          const cat = resolveSectorCategory(proj.sector || proj.department, proj.project_name);
+                          const cps = getSectorCheckpoints(cat);
+                          if (cps.length > 0) {
+                            setScheduleCheckpointNum(cps[0].num);
+                          }
+                        }
+                      }}
+                      className="w-full p-2.5 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0b1f4b]"
+                    >
+                      {projectsList.map((p) => (
+                        <option key={p.project_id} value={p.project_id}>
+                          {p.project_id} — {p.project_name} ({p.state || "National"})
                         </option>
                       ))}
                     </select>
+                    {targetProj && (
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                        <span className="font-semibold text-[#0b1f4b]">{targetCat.toUpperCase()} Sector</span>
+                        <span>•</span>
+                        <span>State: {targetProj.state || "National"}</span>
+                        <span>•</span>
+                        <span>Claimed Progress: {targetProj.reported_progress || 0}%</span>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Assigned Inspection Authority */}
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Assigned Inspection Authority</label>
-                    <select className="w-full p-2 rounded-lg border border-slate-300 font-medium">
-                      <option>S. Venkatesh, JE (KES / NHAI Div-IV)</option>
-                      <option>K. Rajan, AEE (CPWD Civil Zone 1)</option>
-                      <option>M. Reddy, Senior Drone Pilot (KSRSAC)</option>
-                      <option>Ananya Roy, EE (MoRTH Technical Wing)</option>
+                    <label className="block text-slate-700 font-bold mb-1 flex items-center justify-between">
+                      <span>Assigned Inspection Authority</span>
+                      <span className="text-[10px] text-emerald-700 font-semibold">
+                        Official Login Portal Members
+                      </span>
+                    </label>
+                    <select
+                      value={scheduleAssignee}
+                      onChange={(e) => setScheduleAssignee(e.target.value)}
+                      className="w-full p-2.5 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0b1f4b]"
+                    >
+                      <optgroup label="🛠️ Field Verification Officers (Recommended for Site & Drone Audits)">
+                        {officialMembers
+                          .filter((m) => m.category === "field")
+                          .map((m) => {
+                            const isCurrent = user?.username === m.username;
+                            return (
+                              <option key={m.username} value={m.username}>
+                                {m.full_name} ({m.username}) — {m.roleTitle} {isCurrent ? "★ [You / Current User]" : ""}
+                              </option>
+                            );
+                          })}
+                      </optgroup>
+                      <optgroup label="🏛️ Government & Ministry Oversight Officers">
+                        {officialMembers
+                          .filter((m) => m.category === "govt")
+                          .map((m) => {
+                            const isCurrent = user?.username === m.username;
+                            return (
+                              <option key={m.username} value={m.username}>
+                                {m.full_name} ({m.username}) — {m.department} {isCurrent ? "★ [You / Current User]" : ""}
+                              </option>
+                            );
+                          })}
+                      </optgroup>
+                      <optgroup label="🛡️ PMO Administrators">
+                        {officialMembers
+                          .filter((m) => m.category === "admin")
+                          .map((m) => {
+                            const isCurrent = user?.username === m.username;
+                            return (
+                              <option key={m.username} value={m.username}>
+                                {m.full_name} ({m.username}) — {m.roleTitle} {isCurrent ? "★ [You / Current User]" : ""}
+                              </option>
+                            );
+                          })}
+                      </optgroup>
                     </select>
+
+                    {/* Selected Officer Preview Badge */}
+                    {selectedAuthority && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center font-black text-xs text-white flex-shrink-0 shadow-2xs"
+                            style={{ background: selectedAuthority.avatarColor }}
+                          >
+                            {selectedAuthority.full_name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                              <span>{selectedAuthority.full_name}</span>
+                              <span className="font-mono text-[10px] text-slate-500 font-normal">
+                                (@{selectedAuthority.username})
+                              </span>
+                              {user?.username === selectedAuthority.username && (
+                                <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full">
+                                  Current User
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 leading-tight">
+                              {selectedAuthority.division} · {selectedAuthority.department}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-700">
+                            {selectedAuthority.role.replace("_", " ")}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Audit Checkpoint Scope */}
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Audit Checkpoint Scope</label>
-                    <select className="w-full p-2 rounded-lg border border-slate-300 font-medium">
-                      {getSectorCheckpoints(selectedSectorCat).map((cp) => (
-                        <option key={cp.num}>
+                    <label className="block text-slate-700 font-bold mb-1">
+                      Audit Checkpoint Scope ({targetCat.toUpperCase()})
+                    </label>
+                    <select
+                      value={scheduleCheckpointNum}
+                      onChange={(e) => setScheduleCheckpointNum(e.target.value)}
+                      className="w-full p-2.5 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-[#0b1f4b]"
+                    >
+                      {targetCheckpoints.map((cp) => (
+                        <option key={cp.num} value={cp.num}>
                           Checkpoint {cp.num}: {cp.name}
                         </option>
                       ))}
                     </select>
                   </div>
+
+                  {/* Method Tier & Target Date */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Audit Tier Protocol</label>
+                      <select
+                        value={scheduleTier}
+                        onChange={(e) => setScheduleTier(e.target.value as any)}
+                        className="w-full p-2 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800"
+                      >
+                        <option value="Tier 3: Ground">Tier 3: Ground Physical Audit</option>
+                        <option value="Tier 2: Drone">Tier 2: UAV Drone Photogrammetry</option>
+                        <option value="Tier 1: Space">Tier 1: Space Orbital Corroboration</option>
+                        <option value="Tier 4: Treasury">Tier 4: Treasury & GST e-Way Bill</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 font-bold mb-1">Scheduled Target Date</label>
+                      <input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        className="w-full p-2 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Directive Notes */}
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">
+                      Special Directive / Field Instructions (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Conduct volumetric DSM cut/fill comparison and core sample density verification"
+                      value={scheduleNotes}
+                      onChange={(e) => setScheduleNotes(e.target.value)}
+                      className="w-full p-2 rounded-lg border border-slate-300 font-medium text-xs bg-white text-slate-800 placeholder-slate-400"
+                    />
+                  </div>
                 </div>
 
-                <div className="flex justify-end gap-2 text-xs">
+                <div className="flex justify-end gap-2 text-xs pt-3 border-t border-slate-100">
                   <button
                     onClick={() => setModalType(null)}
                     className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
@@ -1430,13 +1912,11 @@ export default function Inspections() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      alert("Inspection scheduled successfully. Task dispatched to field officer's mobile app.");
-                      setModalType(null);
-                    }}
-                    className="px-4 py-2 font-bold bg-[#0b1f4b] hover:bg-[#152e6d] text-white rounded-lg shadow-sm cursor-pointer"
+                    onClick={handleDispatchInspection}
+                    className="px-4 py-2 font-bold bg-[#0b1f4b] hover:bg-[#152e6d] text-white rounded-lg shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
                   >
-                    Dispatch Inspection Order
+                    <span>Dispatch Inspection Order</span>
+                    <span>→</span>
                   </button>
                 </div>
               </div>
