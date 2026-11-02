@@ -252,7 +252,7 @@ export default function ProjectDetails() {
           <h2 className="text-lg font-bold text-navy-900 mb-2">Project Inaccessible or Outside Jurisdiction</h2>
           <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-[550px] mx-auto">
             Project <span className="font-mono font-bold text-navy-800">#{id}</span> is not accessible under your current active role (<strong>{user ? (user.role?.replace(/_/g, " ") || "Authorized User") : "Guest Citizen"}</strong>).
-            {user?.state && <span> Your jurisdictional scope is limited to <strong>{user.state}</strong> infrastructure records.</span>}
+            {user?.role !== "ADMIN" && user?.state && <span> Your jurisdictional scope is limited to <strong>{user.state}</strong> infrastructure records.</span>}{user?.role === "ADMIN" && <span> As System Administrator, you have complete nationwide oversight. Please check if this project exists in the national registry.</span>}
           </p>
           <div className="flex justify-center gap-3">
             <button
