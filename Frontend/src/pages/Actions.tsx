@@ -122,6 +122,16 @@ function LayersIcon({ className = "w-4 h-4", color = "currentColor" }: { classNa
   )
 }
 
+const STATUS_MAP: Record<string, { bg: string; color: string }> = {
+  OPEN: { bg: "#e0e7ff", color: "#4338ca" },
+  ASSIGNED: { bg: "#e0e7ff", color: "#4338ca" },
+  IN_PROGRESS: { bg: "#e0f2fe", color: "#0369a1" },
+  AWAITING_REVIEW: { bg: "#fef3c7", color: "#b45309" },
+  CLOSED: { bg: "#dcfce7", color: "#15803d" },
+  CANCELLED: { bg: "#f1f5f9", color: "#475569" },
+  REOPENED: { bg: "#fee2e2", color: "#b91c1c" }
+};
+
 export default function Actions() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -360,11 +370,12 @@ export default function Actions() {
     }
   }
 
-  const isAssigneeOrSubmitter =
+  const isAssigneeOrSubmitter = Boolean(
     selectedAction &&
     user?.username &&
     (selectedAction.assigned_to === user.username ||
       selectedAction.resolution_submitted_by === user.username)
+  )
 
   const canCreate = user?.role === "ADMIN" || user?.role === "GOVERNMENT_OFFICER"
 
@@ -1470,7 +1481,7 @@ export default function Actions() {
                       <div style={{ display: "flex", gap: 10 }}>
                         <button
                           type="button"
-                          disabled={reviewLoading || isAssigneeOrSubmitter}
+                          disabled={Boolean(reviewLoading || isAssigneeOrSubmitter)}
                           onClick={() => handleReview(true)}
                           style={{
                             background: isAssigneeOrSubmitter ? "#9ca3af" : "#16a34a",
@@ -1568,33 +1579,41 @@ export default function Actions() {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {(selectedAction.audit_history || []).map((evt, idx) => (
-                      <div key={evt.event_id || idx} style={{ background: "#f8fafc", padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                          <span style={{ fontSize: "0.76rem", fontWeight: 800, color: "#0f2a6b", fontFamily: "var(--font-mono, monospace)" }}>
-                            {evt.event_type}
-                          </span>
-                          <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
-                            {new Date(evt.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-
-                        <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: 6 }}>
-                          Authorized Actor: <strong style={{ color: "#0f172a" }}>{evt.actor_username}</strong> ({evt.actor_role})
-                        </div>
-
-                        {evt.details && Object.keys(evt.details).length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 6, background: "#ffffff", padding: 8, borderRadius: 6, border: "1px solid #f1f5f9" }}>
-                            {Object.entries(evt.details).map(([k, v]) => (
-                              <div key={k} style={{ fontSize: "0.72rem" }}>
-                                <span style={{ color: "#64748b", fontWeight: 600 }}>{k}: </span>
-                                <span style={{ color: "#0f2a6b", fontWeight: 700 }}>{String(v)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                    {(!selectedAction.audit_history || selectedAction.audit_history.length === 0) ? (
+                      <div style={{ color: "#64748b", fontSize: "0.82rem", textAlign: "center", padding: "28px 20px", background: "#f8fafc", borderRadius: 10, border: "1px dashed #cbd5e1" }}>
+                        No audit events recorded for this directive yet.
                       </div>
-                    ))}
+                    ) : (
+                      selectedAction.audit_history.map((evt, idx) => (
+                        <div key={evt.event_id || idx} style={{ background: "#f8fafc", padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ fontSize: "0.76rem", fontWeight: 800, color: "#0f2a6b", fontFamily: "var(--font-mono, monospace)" }}>
+                              {evt.event_type}
+                            </span>
+                            <span style={{ fontSize: "0.7rem", color: "#64748b" }}>
+                              {evt.timestamp ? new Date(evt.timestamp).toLocaleString() : "—"}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: 6 }}>
+                            Authorized Actor: <strong style={{ color: "#0f172a" }}>{evt.actor_username || "System"}</strong> ({evt.actor_role || "N/A"})
+                          </div>
+
+                          {evt.details && typeof evt.details === "object" && Object.keys(evt.details).length > 0 && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 6, background: "#ffffff", padding: 8, borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                              {Object.entries(evt.details).map(([k, v]) => (
+                                <div key={k} style={{ fontSize: "0.72rem" }}>
+                                  <span style={{ color: "#64748b", fontWeight: 600 }}>{k}: </span>
+                                  <span style={{ color: "#0f2a6b", fontWeight: 700 }}>
+                                    {Array.isArray(v) ? v.join(", ") : typeof v === "object" && v !== null ? JSON.stringify(v) : String(v ?? "—")}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
